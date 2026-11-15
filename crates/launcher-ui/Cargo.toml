@@ -1,0 +1,29 @@
+[package]
+name = "launcher-ui"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "daedyx-launcher"
+path = "src/main.rs"
+
+[[bin]]
+name = "make-icon"
+path = "src/bin/make_icon.rs"
+
+[dependencies]
+launcher-core = { path = "../launcher-core" }
+daedyx-update = { path = "../daedyx-update" }
+eframe.workspace = true
+clap.workspace = true
+serde.workspace = true
+sys-locale.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+winreg.workspace = true
+
+[dev-dependencies]
+egui_kittest.workspace = true
+tempfile.workspace = true

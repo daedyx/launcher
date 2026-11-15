@@ -1,0 +1,3 @@
+PLATZHALTER: Hier steht der öffentliche Katalog-Schlüssel (Inhalt von catalog.pub).
+Vor dem ersten Setup durch den echten öffentlichen Schlüssel ersetzen und committen.
+Öffentliche Schlüssel dürfen ins Repository; der geheime Schlüssel nie.
