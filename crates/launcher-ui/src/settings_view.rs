@@ -158,7 +158,8 @@ pub fn show(
                             .desired_width(f32::INFINITY),
                     );
                     ui.add_space(8.0);
-                    ui.horizontal(|ui| {
+                    // Untereinander: nebeneinander reicht die Spaltenbreite nicht, die Box würde über den Fensterrand wachsen
+                    ui.vertical(|ui| {
                         if outlined_button(ui, t.t("settings.apply")) {
                             out.config_save = true;
                         }
