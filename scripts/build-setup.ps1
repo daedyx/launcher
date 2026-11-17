@@ -22,6 +22,12 @@ if ($BaseUrl -and -not ($BaseUrl -match '^https://' -or $BaseUrl -match '^http:/
   throw "BaseUrl muss mit https:// beginnen (lokal: http://127.0.0.1)"
 }
 $env:Path += ";$env:USERPROFILE\.cargo\bin"
+# Der Launcher kennt seine Version nur aus Cargo.toml (Selbst-Update vergleicht sie mit dem Katalog):
+# Setup-Version und eingebaute Version müssen gleich sein, sonst bietet er sich nach der Installation selbst ein Update an.
+if (-not $SkipBuild) {
+  $cargoVersion = (Select-String -Path "Cargo.toml" -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+  if ($cargoVersion -ne $Version) { throw "Version $Version passt nicht zu Cargo.toml ($cargoVersion). Zuerst scripts\ci\set-version.ps1 -Version $Version." }
+}
 
 if ($RequireRealKey) {
   $env:DAEDYX_REQUIRE_REAL_KEY = "1"
