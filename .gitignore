@@ -5,3 +5,7 @@ target/
 *.key
 *.sec
 dist/
+
+# Arbeitsanweisungen für Claude bleiben lokal, nie ins Git
+CLAUDE.md
+.claude/
