@@ -197,10 +197,11 @@ fn einstellung_wird_geprueft_gespeichert_und_ersetzt_die_startparameter() {
             serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap_or_default(),
         )
     };
-    // Ohne Einstellung und ohne Parameter: verständlicher Fehler
-    let (ok, v) = run_plain(&["list"]);
-    assert!(!ok);
-    assert!(v["error"].as_str().unwrap().contains("config set"), "{v}");
+    // Ohne Einstellung ist nichts gespeichert (die eingebaute Quelle gilt dann; `list` würde das
+    // Netz benutzen, darum hier nur `config show`, damit der Test von der Umgebung unabhängig bleibt)
+    let (ok, v) = run_plain(&["config", "show"]);
+    assert!(ok);
+    assert!(v["catalog"].is_null() && v["pubkey"].is_null(), "{v}");
     // Ungültiger Schlüssel wird nicht gespeichert
     let junk = env.keys.path().join("junk.pub");
     std::fs::write(&junk, "nichts").unwrap();
