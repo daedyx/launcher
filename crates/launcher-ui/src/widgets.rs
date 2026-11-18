@@ -92,6 +92,57 @@ fn spinner_with(ui: &mut egui::Ui, text: String) {
     });
 }
 
+/// Fortschritt in fester Breite (Listenzeile): Balken oben, Text darunter und notfalls gekürzt,
+/// damit die Zeile in keiner Sprache breiter wird als vorgesehen.
+pub fn busy_view_in(ui: &mut egui::Ui, t: &Texts, busy: &Busy, width: f32) {
+    ui.allocate_ui_with_layout(
+        egui::vec2(width, 0.0),
+        egui::Layout::top_down(egui::Align::Min),
+        |ui| {
+            ui.set_width(width);
+            let (frac, key, args) = match busy {
+                Busy::Downloading { done, total } => match total.filter(|x| *x > 0) {
+                    Some(total) => {
+                        let f = (*done as f32 / total as f32).clamp(0.0, 1.0);
+                        (
+                            Some(f),
+                            "busy.downloading",
+                            vec![("percent", format!("{:.0}", f * 100.0))],
+                        )
+                    }
+                    None => (
+                        None,
+                        "busy.downloading_mb",
+                        vec![("mb", (done / (1024 * 1024)).to_string())],
+                    ),
+                },
+                Busy::Installing => (None, "busy.installing", vec![]),
+                Busy::Removing => (None, "busy.removing", vec![]),
+            };
+            match frac {
+                Some(f) => {
+                    ui.add(
+                        ProgressBar::new(f)
+                            .desired_width(width)
+                            .desired_height(10.0)
+                            .fill(Palette::current(ui).primary),
+                    );
+                }
+                None => {
+                    ui.add(
+                        egui::ProgressBar::new(0.0)
+                            .desired_width(width)
+                            .desired_height(10.0)
+                            .animate(true),
+                    );
+                }
+            }
+            let a: Vec<(&str, &str)> = args.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            ui.add(egui::Label::new(RichText::new(t.tf(key, &a)).size(12.0)).truncate());
+        },
+    );
+}
+
 pub fn busy_view(ui: &mut egui::Ui, t: &Texts, busy: &Busy) {
     match busy {
         Busy::Downloading { done, total } => match total.filter(|x| *x > 0) {

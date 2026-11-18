@@ -2,7 +2,7 @@ use crate::chips::{author_chip, chips, version_label};
 use crate::i18n::Texts;
 use crate::model::{Busy, Card};
 use crate::palette::Palette;
-use crate::widgets::{badge, busy_view, buttons, hover_state, track_hover, Action};
+use crate::widgets::{badge, busy_view_in, buttons, hover_state, track_hover, Action};
 use eframe::egui::{self, RichText};
 
 const MAIN_BUTTON_WIDTH: f32 = 120.0;
@@ -43,10 +43,7 @@ pub fn show(ui: &mut egui::Ui, t: &Texts, card: &Card, busy: Option<&Busy>) -> O
                 ui.add_space((ui.available_width() - ACTIONS_WIDTH).max(8.0));
                 match busy {
                     Some(b) => {
-                        ui.scope(|ui| {
-                            ui.set_max_width(ACTIONS_WIDTH);
-                            busy_view(ui, t, b);
-                        });
+                        busy_view_in(ui, t, b, ACTIONS_WIDTH);
                     }
                     None => action = buttons(ui, t, card, Some(MAIN_BUTTON_WIDTH)),
                 }
