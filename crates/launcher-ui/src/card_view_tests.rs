@@ -188,3 +188,38 @@ fn laufende_app_zeigt_das_etikett_laeuft() {
     assert!(h.query_by_label("Läuft").is_some());
     assert!(!has_label(CardState::Installed, None, "Läuft"));
 }
+
+/// E5: Kacheln einer Reihe sind gleich hoch, auch wenn eine Beschreibung umbricht.
+#[test]
+fn kacheln_einer_reihe_sind_gleich_hoch() {
+    use crate::section_view::{section, View};
+    use std::collections::BTreeMap;
+    let t = Texts::de();
+    let mut kurz = card(CardState::Installed);
+    kurz.id = "kurz".into();
+    kurz.description = "Kurz.".into();
+    let mut lang = card(CardState::Installed);
+    lang.id = "lang".into();
+    lang.description = "Eine sehr lange Beschreibung, die mehrfach umbricht und die Kachel höher macht, als die andere ist, damit der Unterschied sichtbar wird. ".repeat(3);
+    let busy = BTreeMap::new();
+    let mut h = Harness::builder()
+        .with_size(eframe::egui::vec2(700.0, 900.0))
+        .build_ui(|ui| {
+            section(ui, "x", View::Tiles, &t, &busy, &[&kurz, &lang]);
+        });
+    h.run();
+    h.run();
+    let ks = h.get_by_label("Kurz.").rect();
+    let bottoms: Vec<f32> = h
+        .get_all_by_label("Öffnen")
+        .map(|b| b.rect().bottom())
+        .collect();
+    assert!(ks.height() > 0.0);
+    assert!(bottoms.len() >= 2, "Knöpfe: {bottoms:?}");
+    let min = bottoms.iter().cloned().fold(f32::MAX, f32::min);
+    let max = bottoms.iter().cloned().fold(f32::MIN, f32::max);
+    assert!(
+        max - min < 1.0,
+        "Knöpfe auf unterschiedlicher Höhe: {bottoms:?}"
+    );
+}
