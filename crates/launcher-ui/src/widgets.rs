@@ -70,6 +70,11 @@ pub fn badge(ui: &mut egui::Ui, card: &Card, colored: bool, size: f32) {
 
 /// Installierte Version, sonst die neueste, als „V1.2.3“.
 pub fn version_text(t: &Texts, card: &Card) -> String {
+    if let (CardState::UpdateAvailable, Some(from), Some(to)) =
+        (card.state, card.installed.as_ref(), card.latest.as_ref())
+    {
+        return t.tf("version.update", &[("from", from), ("to", to)]);
+    }
     match card.installed.as_ref().or(card.latest.as_ref()) {
         Some(v) => t.tf("version.short", &[("version", v)]),
         None => String::new(),
@@ -92,7 +97,11 @@ pub fn busy_view(ui: &mut egui::Ui, t: &Texts, busy: &Busy) {
         Busy::Downloading { done, total } => match total.filter(|x| *x > 0) {
             Some(total) => {
                 let frac = (*done as f32 / total as f32).clamp(0.0, 1.0);
-                ui.add(ProgressBar::new(frac).fill(Palette::current(ui).primary));
+                ui.add(
+                    ProgressBar::new(frac)
+                        .desired_width(64.0)
+                        .fill(Palette::current(ui).primary),
+                );
                 ui.label(t.tf(
                     "busy.downloading",
                     &[("percent", &format!("{:.0}", frac * 100.0))],

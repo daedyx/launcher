@@ -44,6 +44,8 @@ mod model_tests;
 #[cfg(test)]
 mod palette_tests;
 #[cfg(test)]
+mod row_view_tests;
+#[cfg(test)]
 mod settings_tests;
 #[cfg(test)]
 mod widgets_tests;

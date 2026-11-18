@@ -145,11 +145,7 @@ fn waehrend_des_downloads_gibt_es_keine_knoepfe_aber_fortschritt() {
         busy.clone(),
         "Installieren"
     ));
-    assert!(has_label(
-        CardState::NotInstalled,
-        busy,
-        "Lädt herunter … 50 %"
-    ));
+    assert!(has_label(CardState::NotInstalled, busy, "Lädt … 50 %"));
 }
 
 #[test]

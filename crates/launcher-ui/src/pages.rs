@@ -2,7 +2,7 @@
 use crate::app::LauncherApp;
 use crate::chrome;
 use crate::filter::filter_sort;
-use crate::model::{Card, CardState, Load};
+use crate::model::{Card, CardState, Load, Notice};
 use crate::notice_view;
 use crate::row_view;
 use crate::section_view::section;
@@ -45,7 +45,8 @@ impl LauncherApp {
             .iter()
             .filter(|c| c.state == CardState::UpdateAvailable)
             .collect();
-        if pending.is_empty() && self.model.self_update.is_none() {
+        let failed = matches!(self.model.notice, Some(Notice::Error(_)));
+        if pending.is_empty() && self.model.self_update.is_none() && !failed {
             ui.label(RichText::new(self.t.t("updates.none")).size(15.0));
         }
         egui::ScrollArea::vertical()

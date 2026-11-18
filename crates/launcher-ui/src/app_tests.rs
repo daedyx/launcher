@@ -337,3 +337,20 @@ fn schalter_beim_anmelden_starten_schreibt_und_entfernt_den_eintrag() {
     drop(h);
     let _ = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER).delete_subkey_all(&key);
 }
+
+#[test]
+fn updates_seite_behauptet_nach_katalogfehler_nichts() {
+    use crate::model::Notice;
+    let t = Texts::de();
+    let msg = t.t("setup.missing");
+    let mut app = LauncherApp::new(t, Err(msg));
+    app.model.notice = Some(Notice::Error("Katalog abgelehnt".into()));
+    let mut h = Harness::new_ui(|ui| app.draw(ui));
+    h.run();
+    h.get_by_label("Updates").click();
+    h.run();
+    assert!(h.query_by_label("Updates im Überblick").is_some());
+    assert!(h
+        .query_by_label("Alles ist auf dem neuesten Stand.")
+        .is_none());
+}

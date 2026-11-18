@@ -44,3 +44,15 @@ fn installierte_apps_sind_immer_farbig_andere_nur_beim_darueberfahren() {
     assert_eq!(badge_saturation(&card(CardState::NotInstalled), false), 0.0);
     assert!(badge_saturation(&card(CardState::NotInstalled), true) > 0.0);
 }
+
+#[test]
+fn update_zeile_zeigt_alte_und_neue_version() {
+    use crate::widgets::version_text;
+    let t = Texts::de();
+    let mut c = card(CardState::UpdateAvailable);
+    c.installed = Some("1.0.0".into());
+    c.latest = Some("1.1.0".into());
+    assert_eq!(version_text(&t, &c), "V1.0.0 auf V1.1.0");
+    c.state = CardState::Installed;
+    assert_eq!(version_text(&t, &c), "V1.0.0");
+}
