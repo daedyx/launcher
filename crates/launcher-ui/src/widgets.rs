@@ -96,10 +96,11 @@ fn spinner_with(ui: &mut egui::Ui, text: String) {
 /// damit die Zeile in keiner Sprache breiter wird als vorgesehen.
 pub fn busy_view_in(ui: &mut egui::Ui, t: &Texts, busy: &Busy, width: f32) {
     ui.allocate_ui_with_layout(
-        egui::vec2(width, 0.0),
+        egui::vec2(width, 26.0),
         egui::Layout::top_down(egui::Align::Min),
         |ui| {
             ui.set_width(width);
+            ui.spacing_mut().item_spacing.y = 2.0;
             let (frac, key, args) = match busy {
                 Busy::Downloading { done, total } => match total.filter(|x| *x > 0) {
                     Some(total) => {

@@ -141,6 +141,7 @@ impl LauncherApp {
         self.page = page;
         self.confirm_dialog(ui.ctx());
         self.running_dialog(ui.ctx());
+        crate::focus::draw_ring(ui.ctx());
     }
 
     /// Startet das Selbst-Update, wenn nicht schon eines läuft.

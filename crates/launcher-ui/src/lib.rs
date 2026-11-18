@@ -10,6 +10,7 @@ pub mod chips;
 pub mod chrome;
 pub mod errors;
 pub mod filter;
+pub mod focus;
 pub mod fonts;
 pub mod i18n;
 pub mod model;
@@ -37,6 +38,8 @@ mod card_view_tests;
 mod errors_tests;
 #[cfg(test)]
 mod filter_tests;
+#[cfg(test)]
+mod focus_tests;
 #[cfg(test)]
 mod i18n_tests;
 #[cfg(test)]

@@ -50,3 +50,27 @@ fn zeile_beim_download_bleibt_im_fenster() {
         }
     }
 }
+
+/// E9: Die Zeile wird beim Download nicht höher als sonst.
+#[test]
+fn zeile_springt_beim_download_nicht_in_der_hoehe() {
+    let t = Texts::de();
+    let c = card();
+    let height = |busy: Option<Busy>| {
+        let h = std::cell::Cell::new(0.0_f32);
+        let mut harness = Harness::builder()
+            .with_size(eframe::egui::vec2(1000.0, 300.0))
+            .build_ui(|ui| {
+                row_view::show(ui, &t, &c, busy.as_ref());
+                h.set(ui.min_rect().height());
+            });
+        harness.run_steps(3);
+        h.get()
+    };
+    let idle = height(None);
+    let busy = height(Some(Busy::Downloading {
+        done: 10,
+        total: Some(100),
+    }));
+    assert!(busy <= idle + 0.5, "Zeile {busy} > {idle}");
+}
