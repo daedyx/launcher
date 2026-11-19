@@ -3,6 +3,7 @@ name = "launcher-core"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license = "MIT"
 
 [dependencies]
 daedyx-update = { path = "../daedyx-update" }

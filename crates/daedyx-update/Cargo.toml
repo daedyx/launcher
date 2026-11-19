@@ -3,6 +3,7 @@ name = "daedyx-update"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+license = "MIT"
 
 [dependencies]
 serde.workspace = true
