@@ -507,3 +507,9 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | zvariant | 5.15.1 | MIT | https://github.com/z-galaxy/zbus/ |
 | zvariant_derive | 5.15.1 | MIT | https://github.com/z-galaxy/zbus/ |
 | zvariant_utils | 4.2.0 | MIT | https://github.com/z-galaxy/zbus/ |
+
+## Symbole und Schriften
+
+- `installer/daedyx.ico`: eigenes Werk. Es wird mit dem Programm `crates/launcher-ui/src/bin/make_icon.rs` aus der Vektormarke in `crates/launcher-ui/src/brand.rs` erzeugt (MIT, wie der übrige Code).
+- Schriften unter `crates/launcher-ui/assets/fonts/`: Bricolage Grotesque, Space Grotesk, Space Mono, jeweils unter der SIL Open Font License 1.1; die Lizenztexte liegen als `*-OFL.txt` daneben und müssen bei der Weitergabe beibehalten werden.
+- Die Oberflächenbibliothek `egui` bringt Standardschriften mit (`epaint_default_fonts`: Hack, Ubuntu Font; Lizenzen MIT, OFL 1.1 und Ubuntu Font License 1.0).
