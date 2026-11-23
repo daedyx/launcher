@@ -1,0 +1,2 @@
+# Git-Haken laufen in sh und brauchen LF-Zeilenenden, auch unter Windows.
+.githooks/* text eol=lf

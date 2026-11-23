@@ -1,0 +1,8 @@
+#!/bin/sh
+# Sicherheitsrahmen (docs/SICHERHEIT.md 6.2): lokale Prüfung vor jedem Commit, ohne Netz und ohne Fremddienst.
+# Einschalten je Klon (einmal):  git config core.hooksPath .githooks
+# Nie mit --no-verify umgehen (SICHERHEIT 5.7).
+set -e
+cargo fmt --all --check
+cargo xtask scan --staged
+cargo xtask exceptions
