@@ -5,6 +5,7 @@ members = [
     "crates/launcher-core",
     "crates/launcher-cli",
     "crates/launcher-ui",
+    "xtask",
 ]
 
 [workspace.package]
@@ -31,3 +32,35 @@ sys-locale = "0.3.2"
 winreg = "0.56.0"
 sysinfo = { version = "0.40.3", default-features = false, features = ["system"] }
 rpassword = "7.5.5"
+
+# Sicherheitsrahmen (docs/SICHERHEIT.md, Abschnitt 2 und Anhang A).
+# Ausnahmen nur mit Eintrag in docs/SICHERHEIT-AUSNAHMEN.md.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+# Absturzfreiheit (2.2)
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+todo = "deny"
+unimplemented = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+get_unwrap = "deny"
+# Keine Ausgaben/Protokolle (2.11)
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+# unsafe nur dokumentiert
+undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+# Rechnen und Umwandeln
+cast_possible_truncation = "warn"
+cast_sign_loss = "warn"
+arithmetic_side_effects = "warn"
+mem_forget = "deny"
+exit = "deny"

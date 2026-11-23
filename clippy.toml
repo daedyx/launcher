@@ -1,0 +1,10 @@
+# Sicherheitsrahmen (docs/SICHERHEIT.md, Anhang B). Änderungen nur mit Björns Ja.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-indexing-slicing-in-tests = true
+disallowed-methods = [
+  { path = "std::process::Command::new", reason = "Keine Prozesse mit Fremddaten (SICHERHEIT 2.7); Ausnahme nur mit Eintrag" },
+  { path = "std::env::temp_dir", reason = "Temp nur im eigenen Datenordner (SICHERHEIT 2.8)" },
+  { path = "std::net::TcpStream::connect", reason = "Netz nur über ein Gate (SICHERHEIT 2.6)" },
+]

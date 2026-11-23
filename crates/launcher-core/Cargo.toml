@@ -20,3 +20,6 @@ winreg.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 minisign.workspace = true
+
+[lints]
+workspace = true
