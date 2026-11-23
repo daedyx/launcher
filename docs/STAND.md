@@ -1,8 +1,9 @@
 # Stand
 
-Letzte Änderung: 2026-11-15
+Letzte Änderung: 2026-11-23
 
 ## Wo wir stehen
+- **Sicherheitsrahmen eingeführt (2026-11-23, Zweig `paket-sicherheitsrahmen`, nicht in `main`):** Lints erzwingen kein `unsafe`, keine Panik-Stellen und keine Konsolen-Ausgaben im Normalpfad; `cargo deny`/`cargo audit` als Lieferketten-Tor (`url` auf 2.5.9 wegen RUSTSEC-2026-0592); eigenes Prüfwerkzeug `cargo xtask scan`/`exceptions` mit Pre-Commit-Haken; CI-Workflow `ci.yml` bei jedem Push und Pull Request (ohne Secrets). Behoben: Überlauf in der Prozentanzeige bei riesigen Größen, Absturz bei vergiftetem Mutex, Index-Zugriffe. 23 eingetragene Ausnahmen mit Ablaufdatum in `docs/SICHERHEIT-AUSNAHMEN.md`. Offene Lücken (Download ohne Obergrenze während des Ladens, keine Zeitgrenze, alter Release-Ablauf mit Secrets) stehen in `docs/SICHERHEIT.md`.
 - **Meilenstein L4 fertig (2026-11-15, ohne Lizenz, ohne Veröffentlichung): Updates kommen von selbst, Launcher hat ein eigenes Gesicht.** 197 Tests grün, Clippy sauber, `scripts/l4-acceptance.ps1` (20 Prüfungen) bestanden.
   - **Eigenes Setup** `installer/launcher.nsi` (NSIS, pro Benutzer, Startmenü, Deinstallation, Symbol `installer/daedyx.ico`). Bauen: `scripts/build-setup.ps1` (liefert Setup, `launcher-catalog-entry.json` im Katalogformat, SHA-256). Schalter `/S /UPDATE [/NOLAUNCH]`: wartet, bis der laufende Launcher beendet ist, ersetzt ihn und startet ihn neu.
   - **Eingebaute Quelle:** `DEFAULT_CATALOG_URL = https://raw.githubusercontent.com/daedyx/releases/main` und öffentlicher Schlüssel `crates/launcher-core/assets/catalog.pub`. **Dort steht noch ein Platzhalter; Björn ersetzt ihn durch den echten öffentlichen Schlüssel** (siehe `docs/ALLTAG.md`), sonst meldet der Launcher „kein Katalog-Schlüssel eingebaut“. Rangfolge: Startparameter/Umgebung > `config.json` (Einstellungen) > eingebaut. Der Release-Bau kann mit `DAEDYX_REQUIRE_REAL_KEY=1` den Platzhalter verbieten.
