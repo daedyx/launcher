@@ -31,6 +31,11 @@ keine Fremdtexte in der Befehlszeile.
 | A-016 | crates/launcher-cli/src/bin/daedyx_catalog/main.rs | clippy::too_many_arguments | Stil-Regel ohne Sicherheitswirkung, schon vor dem Rahmen vorhanden (Funktion `add` des Katalog-Werkzeugs). | Bau-Chat, Björns Ja ausstehend | 2026-11-23 | 2027-06-30 |
 | A-017 | crates/launcher-ui/src/focus.rs | deprecated | Schon vor dem Rahmen vorhanden: veraltete egui-Schnittstelle für die Ebene des Fokusrings; Ersatz mit dem nächsten egui-Wechsel. | Bau-Chat, Björns Ja ausstehend | 2026-11-23 | 2027-06-30 |
 | A-018 | .github/workflows/release.yml | scan:secret-im-workflow | Alter Release-Ablauf mit Signaturschlüssel, Passwort und Token als GitHub-Secrets (SICHERHEIT 8.1 Nr. 7). Wird mit dem Plan „ohne Secrets“ (Attestierung) ersetzt; bis dahin keine neuen Secrets. | Bau-Chat, Björns Ja ausstehend | 2026-11-23 | 2027-02-28 |
+| A-019 | deny.toml | RUSTSEC-2026-0192 (ttf-parser nicht gepflegt) | Kommt über egui/winit (Schriften), keine bekannte Lücke, kein Ersatz verfügbar. Neu prüfen mit dem nächsten egui-Wechsel der Suite. | Bau-Chat, Björns Ja ausstehend | 2026-11-23 | 2027-02-28 |
+| A-020 | deny.toml | RUSTSEC-2026-0370 (zvariant nicht gepflegt) | Nur Linux-Barrierefreiheit über egui/accesskit, keine bekannte Lücke. | wie A-019 | 2026-11-23 | 2027-02-28 |
+| A-021 | deny.toml | RUSTSEC-2026-0371 (zbus_names nicht gepflegt) | wie A-020 | wie A-019 | 2026-11-23 | 2027-02-28 |
+| A-022 | deny.toml | RUSTSEC-2026-0372 (zvariant_derive nicht gepflegt) | wie A-020 | wie A-019 | 2026-11-23 | 2027-02-28 |
+| A-023 | deny.toml | Lizenz OFL-1.1 und Ubuntu-font-1.0 für epaint_default_fonts | Die eingebauten egui-Schriften stehen unter Schrift-Lizenzen; sie erlauben Weitergabe mit dem Programm und sind mit MIT verträglich. Gilt nur für dieses eine Crate. | Bau-Chat, Björns Ja ausstehend | 2026-11-23 | 2027-11-23 |
 
 Eine Zeile mit Regel `scan:<regel>` erlaubt genau diesen Fund des Scans in genau dieser Datei bis zum
 Ablaufdatum; sie zählt nicht als Code-Stelle. Gedacht nur für Altlasten, deren Ablösung beschlossen ist.

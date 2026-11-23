@@ -1,0 +1,44 @@
+# Lieferketten-Tor (docs/SICHERHEIT.md 4.2, Anhang C). Ausnahmen nur mit Eintrag in docs/SICHERHEIT-AUSNAHMEN.md.
+# Prüfen: cargo deny --locked check advisories bans licenses sources
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+unmaintained = "all"
+# Je Zeile ein Eintrag in docs/SICHERHEIT-AUSNAHMEN.md (A-019 bis A-022). Alle vier kommen über egui/winit
+# (Linux-Teile und Schrift-Leser) und sind nur „nicht mehr gepflegt“, keine bekannte Lücke.
+ignore = [
+  { id = "RUSTSEC-2026-0192", reason = "ttf-parser nicht gepflegt, über egui/winit; kein Ersatz verfügbar. Neu prüfen mit dem nächsten egui." },
+  { id = "RUSTSEC-2026-0370", reason = "zvariant nicht gepflegt, nur Linux-Barrierefreiheit über egui/accesskit. Neu prüfen mit dem nächsten egui." },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names nicht gepflegt, wie zvariant." },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive nicht gepflegt, wie zvariant." },
+]
+
+[licenses]
+# Nur Lizenzen, die mit MIT verträglich sind.
+allow = [
+  "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause",
+  "ISC", "Zlib", "Unicode-3.0", "CC0-1.0", "0BSD", "BSL-1.0", "MPL-2.0", "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+# Schrift-Lizenzen der eingebauten egui-Schriften (Eintrag A-023); verträglich mit MIT, gelten nur für die Schriften.
+exceptions = [
+  { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Eigene Crates im Workspace stehen nur mit Pfad (publish = false).
+allow-wildcard-paths = true
+deny = [
+  { name = "openssl", reason = "TLS nur über rustls (SICHERHEIT 4.2)" },
+  { name = "native-tls", reason = "TLS nur über rustls (SICHERHEIT 4.2)" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = ["https://github.com/daedyx/core"]
