@@ -148,6 +148,12 @@ fn jedes_ereignis_weckt_die_oberflaeche() {
     w.send(Job::Refresh);
     next(&w);
     next(&w);
+    // Der Arbeiter sendet erst das Ereignis und weckt danach; auf langsamen Rechnern (CI) kommt das
+    // Wecken also kurz nach dem Ereignis an. Bis zu 5 s darauf warten statt eines Wettlaufs.
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while count.load(Ordering::SeqCst) < 2 && std::time::Instant::now() < until {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
     assert!(count.load(Ordering::SeqCst) >= 2);
 }
 
