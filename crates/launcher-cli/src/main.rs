@@ -209,7 +209,12 @@ fn run(cli: &Cli) -> Result<String, CoreError> {
                 done_text(&done)
             })
         }
-        Command::Config { .. } => unreachable!("oben behandelt"),
+        // Wird schon vor dem Laden des Katalogs behandelt; hier nur der Vollständigkeit halber.
+        Command::Config { action } => config_command(
+            cli,
+            cli.data_dir.clone().unwrap_or_else(default_data_dir),
+            action,
+        ),
         Command::SelfUpdate { check, no_launch } => {
             let available = launcher.self_update_available(&catalog)?;
             let update = if *check {
@@ -246,6 +251,11 @@ fn run(cli: &Cli) -> Result<String, CoreError> {
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "SICHERHEIT-AUSNAHMEN A-010"
+)]
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(&cli) {

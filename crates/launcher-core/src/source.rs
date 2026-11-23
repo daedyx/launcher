@@ -128,8 +128,8 @@ fn copy_with_progress(
         if n == 0 {
             break;
         }
-        out.write_all(&buf[..n])?;
-        done += n as u64;
+        out.write_all(buf.get(..n).unwrap_or_default())?;
+        done = done.saturating_add(u64::try_from(n).unwrap_or(u64::MAX));
         progress(done, total);
     }
     out.flush()?;

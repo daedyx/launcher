@@ -1,5 +1,17 @@
 //! Demo-Katalog für die Sichtprüfung: erfundene Apps, Testschlüssel, absichtlich langsamer Server.
 //! Nur für Entwicklung; nichts davon gehört in die Veröffentlichung.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::arithmetic_side_effects,
+    clippy::exit,
+    clippy::disallowed_methods,
+    reason = "SICHERHEIT-AUSNAHMEN A-007"
+)]
 use clap::{Parser, Subcommand};
 use daedyx_update::verify::sha256_file;
 use std::io::{Read, Write};

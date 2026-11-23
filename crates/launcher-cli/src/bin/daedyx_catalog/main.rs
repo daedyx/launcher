@@ -282,6 +282,11 @@ fn run(cli: Cli) -> Result<String, String> {
     }
 }
 
+#[allow(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "SICHERHEIT-AUSNAHMEN A-011"
+)]
 fn main() -> ExitCode {
     match run(Cli::parse()) {
         Ok(text) => {

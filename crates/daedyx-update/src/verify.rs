@@ -13,7 +13,7 @@ pub fn sha256_file(path: &Path) -> Result<String, UpdateError> {
         if n == 0 {
             break;
         }
-        hasher.update(&buf[..n]);
+        hasher.update(buf.get(..n).unwrap_or_default());
     }
     Ok(hex::encode(hasher.finalize()))
 }

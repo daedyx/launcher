@@ -50,6 +50,8 @@ impl Texts {
         Ok(Texts { map })
     }
 
+    /// Die Sprachdateien sind eingebaut; dass sie gültig sind, belegt `i18n_tests` (alle Sprachen).
+    #[allow(clippy::expect_used, reason = "SICHERHEIT-AUSNAHMEN A-013")]
     pub fn for_language(language: Language) -> Texts {
         let json = match language {
             Language::De => include_str!("../lang/de.json"),

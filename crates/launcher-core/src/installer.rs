@@ -30,6 +30,7 @@ impl Installer for SystemInstaller {
 }
 
 #[cfg(windows)]
+#[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-002")]
 fn run_nsis_install(package: &Path, dir: &Path) -> Result<(), CoreError> {
     use std::os::windows::process::CommandExt;
     // NSIS verlangt `/D=` als letztes Argument und ohne Anführungszeichen, auch bei Leerzeichen.
@@ -50,6 +51,7 @@ fn run_nsis_install(_package: &Path, _dir: &Path) -> Result<(), CoreError> {
 }
 
 #[cfg(windows)]
+#[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-002")]
 fn run_nsis_uninstall(dir: &Path) -> Result<(), CoreError> {
     use std::os::windows::process::CommandExt;
     let uninstaller = dir.join("uninstall.exe");

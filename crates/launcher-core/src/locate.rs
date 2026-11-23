@@ -25,7 +25,9 @@ impl Launcher {
                 };
             }
         }
-        let key = self.registry_keys.lock().unwrap().get(id).cloned();
+        let key = crate::sync::lock_or_recover(&self.registry_keys)
+            .get(id)
+            .cloned();
         if let Some(entry) = key.and_then(|k| self.system.uninstall_entry(&k)) {
             if let Some(loc) = entry.install_location.filter(|l| l.is_dir()) {
                 let version = read_installed_version(&loc).or(entry.display_version);

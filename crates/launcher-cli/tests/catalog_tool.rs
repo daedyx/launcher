@@ -1,5 +1,17 @@
 //! Ablauf mit dem Katalog-Werkzeug: Schlüssel erzeugen, Release einfügen, signieren, prüfen,
 //! und der Launcher liest den Katalog. Mit einem Testschlüssel ohne Passwort.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::arithmetic_side_effects,
+    clippy::exit,
+    clippy::disallowed_methods,
+    reason = "SICHERHEIT-AUSNAHMEN A-009"
+)]
 use std::path::Path;
 use std::process::Command;
 

@@ -65,8 +65,8 @@ fn alle_im_code_benutzten_schluessel_existieren() {
         let src = std::fs::read_to_string(&path).unwrap();
         for pat in [".t(\"", ".tf(\""] {
             for (i, _) in src.match_indices(pat) {
-                let rest = &src[i + pat.len()..];
-                let key = &rest[..rest.find('"').unwrap()];
+                let rest = src.get(i + pat.len()..).unwrap_or_default();
+                let key = rest.split('"').next().unwrap_or_default();
                 assert!(t.has(key), "{name}: Schlüssel {key:?} fehlt in de.json");
             }
         }

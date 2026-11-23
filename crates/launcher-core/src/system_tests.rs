@@ -73,6 +73,7 @@ mod windows_only {
     }
 
     /// Kopie eines harmlosen Systemprogramms, das eine Weile läuft, in einem Wegwerfordner.
+    #[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-005")]
     fn start_helper(dir: &std::path::Path) -> std::process::Child {
         let system32 = PathBuf::from(std::env::var("SystemRoot").unwrap()).join("System32");
         let exe = dir.join("hilfsprogramm.exe");

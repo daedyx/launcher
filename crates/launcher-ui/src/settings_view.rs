@@ -107,7 +107,8 @@ pub fn show(
         .auto_shrink([false, false])
         .show(ui, |ui| {
             ui.columns(2, |cols| {
-                boxed(&mut cols[0], t.t("settings.theme"), |ui| {
+                let [left, right] = cols else { return };
+                boxed(left, t.t("settings.theme"), |ui| {
                     let before = settings.theme;
                     segmented(
                         ui,
@@ -120,8 +121,8 @@ pub fn show(
                     );
                     out.theme_changed = before != settings.theme;
                 });
-                cols[0].add_space(8.0);
-                boxed(&mut cols[0], t.t("settings.language"), |ui| {
+                left.add_space(8.0);
+                boxed(left, t.t("settings.language"), |ui| {
                     let before = settings.language;
                     let options = vec![
                         (LanguageChoice::System, t.t("language.system")),
@@ -131,8 +132,8 @@ pub fn show(
                     segmented(ui, &mut settings.language, options);
                     out.language_changed = before != settings.language;
                 });
-                cols[0].add_space(8.0);
-                boxed(&mut cols[0], t.t("settings.box_updates"), |ui| {
+                left.add_space(8.0);
+                boxed(left, t.t("settings.box_updates"), |ui| {
                     out.updates_changed |= ui
                         .checkbox(
                             &mut settings.auto_update_launcher,
@@ -143,7 +144,7 @@ pub fn show(
                         .checkbox(&mut settings.autostart, t.t("settings.autostart"))
                         .changed();
                 });
-                boxed(&mut cols[1], t.t("settings.box_catalog"), |ui| {
+                boxed(right, t.t("settings.box_catalog"), |ui| {
                     heading(ui, t.t("settings.catalog"));
                     ui.add(
                         egui::TextEdit::singleline(&mut edit.catalog)

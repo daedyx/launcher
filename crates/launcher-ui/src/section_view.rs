@@ -45,7 +45,9 @@ pub fn section(
                         let min_h = last.get(row).copied().unwrap_or(0.0);
                         let (a, h) =
                             card_view::show_sized(ui, t, card, busy.get(&card.id), width, min_h);
-                        heights[row] = heights[row].max(h);
+                        if let Some(slot) = heights.get_mut(row) {
+                            *slot = slot.max(h);
+                        }
                         if a.is_some() {
                             chosen = a;
                         }

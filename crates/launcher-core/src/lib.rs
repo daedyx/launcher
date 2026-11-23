@@ -14,6 +14,7 @@ pub mod selfupdate;
 pub mod service;
 pub mod source;
 pub mod state;
+pub mod sync;
 pub mod system;
 
 #[cfg(test)]

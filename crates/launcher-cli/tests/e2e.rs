@@ -1,6 +1,18 @@
 //! Ende-zu-Ende: echte Kommandozeile, echter Download aus einem Katalogordner, echter
 //! Prozessstart eines (Test-)Installers. Läuft nur unter Windows und mit `--features test-helpers`.
 #![cfg(all(windows, feature = "test-helpers"))]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::arithmetic_side_effects,
+    clippy::exit,
+    clippy::disallowed_methods,
+    reason = "SICHERHEIT-AUSNAHMEN A-008"
+)]
 
 use daedyx_update::verify::sha256_file;
 use std::process::Command;

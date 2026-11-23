@@ -52,7 +52,9 @@ fn is_inside(exe: &Path, dir: &Path) -> bool {
     !dir.is_empty()
         && exe.len() > dir.len()
         && exe.starts_with(&dir)
-        && exe[dir.len()..].starts_with('\\')
+        && exe
+            .get(dir.len()..)
+            .is_some_and(|rest| rest.starts_with('\\'))
 }
 
 impl SystemInfo for RealSystem {
@@ -85,6 +87,7 @@ impl SystemInfo for RealSystem {
         None
     }
 
+    #[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-004")]
     fn start_detached(&self, program: &Path, args: &[&str]) -> Result<(), String> {
         let mut command = std::process::Command::new(program);
         command.args(args);

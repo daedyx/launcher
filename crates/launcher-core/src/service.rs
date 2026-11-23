@@ -82,7 +82,7 @@ impl Launcher {
             .map_err(|_| UpdateError::SignatureInvalid)?;
         let catalog = verified_catalog(pubkey_text, &bytes, &sig)?;
         catalog.check_launcher(&self.launcher_version)?;
-        let mut keys = self.registry_keys.lock().unwrap();
+        let mut keys = crate::sync::lock_or_recover(&self.registry_keys);
         keys.clear();
         for app in &catalog.apps {
             if let Some(k) = &app.registry_key {
@@ -125,7 +125,7 @@ impl Launcher {
         let running = self.system.running(&dirs);
         let mut out = Vec::new();
         for (i, app) in apps.iter().enumerate() {
-            let installed = found[i].version.clone();
+            let installed = found.get(i).and_then(|l| l.version.clone());
             let latest = app.latest()?.map(|r| r.version.clone());
             let update_available = match (&installed, &latest) {
                 (Some(i), Some(l)) => is_newer(l, i)?,

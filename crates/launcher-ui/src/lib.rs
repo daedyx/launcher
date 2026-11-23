@@ -1,4 +1,11 @@
 //! Oberfläche des Daedyx Launchers (egui). Zustand und Darstellung sind getrennt, damit beides testbar ist.
+// Rechnen mit Bildschirmmaßen, Farben und Pixeln (keine Fremddaten): SICHERHEIT-AUSNAHMEN A-012.
+#![allow(
+    clippy::arithmetic_side_effects,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "SICHERHEIT-AUSNAHMEN A-012"
+)]
 
 pub mod app;
 mod app_dialogs;

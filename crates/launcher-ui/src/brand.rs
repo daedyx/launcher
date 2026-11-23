@@ -81,7 +81,7 @@ fn dist_to_segment(p: (f32, f32), a: (f32, f32), b: (f32, f32)) -> f32 {
 fn near_line(p: (f32, f32), line: &MarkLine) -> bool {
     line.points
         .windows(2)
-        .any(|w| dist_to_segment(p, w[0], w[1]) <= STROKE_WIDTH / 2.0)
+        .any(|w| matches!(w, [a, b] if dist_to_segment(p, *a, *b) <= STROKE_WIDTH / 2.0))
 }
 
 fn in_rounded_square(p: (f32, f32)) -> bool {
@@ -125,11 +125,13 @@ pub fn render_rgba(size: usize) -> Vec<u8> {
                 }
             }
             let i = (y * size + x) * 4;
-            if cover > 0.0 {
-                out[i] = (r / cover).round() as u8;
-                out[i + 1] = (g / cover).round() as u8;
-                out[i + 2] = (b / cover).round() as u8;
-                out[i + 3] = (255.0 * cover / (N * N) as f32).round() as u8;
+            if let Some(px) = out.get_mut(i..i + 4).filter(|_| cover > 0.0) {
+                px.copy_from_slice(&[
+                    (r / cover).round() as u8,
+                    (g / cover).round() as u8,
+                    (b / cover).round() as u8,
+                    (255.0 * cover / (N * N) as f32).round() as u8,
+                ]);
             }
         }
     }
@@ -153,7 +155,9 @@ pub fn ico_bytes(sizes: &[usize]) -> Vec<u8> {
         for y in (0..size).rev() {
             for x in 0..size {
                 let i = (y * size + x) * 4;
-                dib.extend([rgba[i + 2], rgba[i + 1], rgba[i], rgba[i + 3]]);
+                if let Some(&[r, g, b, a]) = rgba.get(i..i + 4) {
+                    dib.extend([b, g, r, a]);
+                }
             }
         }
         // Maske (bei 32 Bit unbenutzt, alles 0), Zeilen auf 4 Bytes aufgefüllt

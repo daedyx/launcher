@@ -98,9 +98,12 @@ impl Worker {
 }
 
 pub fn percent(done: u64, total: Option<u64>) -> Option<u8> {
-    total
-        .filter(|t| *t > 0)
-        .map(|t| (done.min(t) * 100 / t) as u8)
+    total.filter(|t| *t > 0).and_then(|t| {
+        let share = u128::from(done.min(t))
+            .checked_mul(100)?
+            .checked_div(u128::from(t))?;
+        u8::try_from(share).ok()
+    })
 }
 
 fn refresh(launcher: &Launcher, pubkey: &str, catalog: &mut Option<Catalog>, out: &Emitter) {

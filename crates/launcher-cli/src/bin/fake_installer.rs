@@ -1,6 +1,18 @@
 //! Test-Installer: verhält sich wie ein NSIS-Setup (`/S /D=<Ordner>`) und legt `app.json`
 //! sowie `uninstall.exe` an. Die Version steht am Dateiende hinter `\nDAEDYX-VERSION:`.
 //! Heißt die Datei `uninstall.exe`, entfernt sie `app.json` (wie ein Deinstaller).
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::arithmetic_side_effects,
+    clippy::exit,
+    clippy::disallowed_methods,
+    reason = "SICHERHEIT-AUSNAHMEN A-006"
+)]
 
 use std::path::{Path, PathBuf};
 use std::{env, fs, process::exit};

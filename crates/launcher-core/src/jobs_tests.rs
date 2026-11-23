@@ -35,6 +35,9 @@ fn prozent_wird_berechnet() {
     assert_eq!(percent(300, Some(200)), Some(100));
     assert_eq!(percent(5, None), None);
     assert_eq!(percent(5, Some(0)), None);
+    // Riesige Größen aus einem feindlichen Katalog: kein Überlauf, kein Abschneiden.
+    assert_eq!(percent(u64::MAX, Some(u64::MAX)), Some(100));
+    assert_eq!(percent(u64::MAX / 2, Some(u64::MAX)), Some(49));
 }
 
 #[test]

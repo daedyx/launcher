@@ -48,10 +48,13 @@ pub fn add_release(
                 registry_key: None,
                 releases: vec![],
             });
-            work.apps.len() - 1
+            work.apps.len().saturating_sub(1)
         }
     };
-    let app = &mut work.apps[index];
+    let app = work
+        .apps
+        .get_mut(index)
+        .ok_or_else(|| invalid("App-Eintrag fehlt"))?;
     if let Some(v) = meta.name {
         app.name = v;
     }
@@ -78,7 +81,11 @@ pub fn add_release(
                 release.version
             )))
         }
-        Some(i) => app.releases[i] = release,
+        Some(i) => {
+            if let Some(slot) = app.releases.get_mut(i) {
+                *slot = release;
+            }
+        }
         None => app.releases.push(release),
     }
     *catalog = work;

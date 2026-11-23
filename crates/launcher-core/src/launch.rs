@@ -52,6 +52,7 @@ impl Launcher {
 }
 
 #[cfg(windows)]
+#[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-003")]
 fn spawn_detached(target: &Path, dir: &Path) -> Result<(), CoreError> {
     use std::os::windows::process::CommandExt;
     const DETACHED_PROCESS: u32 = 0x0000_0008;
