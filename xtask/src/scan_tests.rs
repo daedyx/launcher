@@ -68,3 +68,97 @@ fn local_words_are_checked() {
     assert_eq!(f.len(), 1);
     assert_eq!(f.first().map(|x| x.rule), Some("lokale-wortliste"));
 }
+
+/// Erfundene Adresse außerhalb der Test-Domains, zusammengesetzt, damit diese Datei sich nicht selbst meldet.
+const MAIL_LINE: &str = concat!("kontakt = anna", "@", "beispiel.de");
+
+fn utf16(text: &str, big_endian: bool) -> Vec<u8> {
+    let mut out = if big_endian {
+        vec![0xFE, 0xFF]
+    } else {
+        vec![0xFF, 0xFE]
+    };
+    for unit in text.encode_utf16() {
+        let bytes = if big_endian {
+            unit.to_be_bytes()
+        } else {
+            unit.to_le_bytes()
+        };
+        out.extend_from_slice(&bytes);
+    }
+    out
+}
+
+#[test]
+fn utf16_with_bom_is_read_line_by_line() {
+    // So schreibt Windows PowerShell 5.1 mit `>` oder `Out-File`.
+    let text = format!("Ausgabe\r\n{MAIL_LINE}\r\n");
+    for big_endian in [false, true] {
+        let f = scan_file("docs/log.txt", &utf16(&text, big_endian), &[]);
+        assert_eq!(
+            f,
+            vec![Finding {
+                path: "docs/log.txt".into(),
+                line: 2,
+                rule: "mailadresse"
+            }],
+            "BE={big_endian}"
+        );
+    }
+}
+
+#[test]
+fn invalid_utf8_like_windows_1252_is_still_read() {
+    let mut content = b"Gr\xfc\xdfe aus M\xfcnchen\n".to_vec();
+    content.extend_from_slice(MAIL_LINE.as_bytes());
+    content.extend_from_slice(b" (M\xfcller)\n");
+    let f = scan_file("testdata/probe.txt", &content, &[]);
+    assert_eq!(
+        f,
+        vec![Finding {
+            path: "testdata/probe.txt".into(),
+            line: 2,
+            rule: "mailadresse"
+        }]
+    );
+}
+
+#[test]
+fn unknown_binary_files_are_reported_not_skipped() {
+    let content = [0x7F, b'E', b'L', b'F', 0, 0, 1, 2];
+    let f = scan_file("werkzeug/hilfe.bin", &content, &[]);
+    assert_eq!(
+        f,
+        vec![Finding {
+            path: "werkzeug/hilfe.bin".into(),
+            line: 0,
+            rule: "unbekannte-binaerdatei"
+        }]
+    );
+    // UTF-16 ohne BOM sieht aus wie eine Binärdatei: gemeldet, und der Inhalt wird trotzdem gelesen.
+    let no_bom: Vec<u8> = utf16(MAIL_LINE, false).into_iter().skip(2).collect();
+    let rules_found: Vec<_> = scan_file("probe.txt", &no_bom, &[])
+        .into_iter()
+        .map(|f| f.rule)
+        .collect();
+    assert!(
+        rules_found.contains(&"unbekannte-binaerdatei"),
+        "{rules_found:?}"
+    );
+    assert!(rules_found.contains(&"mailadresse"), "{rules_found:?}");
+}
+
+#[test]
+fn only_known_image_and_font_endings_count_as_binary() {
+    let binary = [0u8, 1, 2, 0xFF, 0xD8];
+    for name in [
+        "a.png", "b.JPG", "c.jpeg", "d.gif", "e.ico", "f.icns", "g.webp", "h.bmp", "i.ttf",
+        "j.otf", "k.woff", "l.woff2",
+    ] {
+        assert!(scan_file(name, &binary, &[]).is_empty(), "{name}");
+    }
+    assert_eq!(
+        rules("bild.png.txt", "\u{0}x"),
+        vec![(0, "unbekannte-binaerdatei")]
+    );
+}

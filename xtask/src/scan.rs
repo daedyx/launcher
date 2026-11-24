@@ -6,6 +6,11 @@ const FORBIDDEN_EXT: [&str; 13] = [
     "db", "sqlite", "sqlite3", "eml", "msg", "mbox", "pst", "ics", "vcf", "p12", "pfx", "pem",
     "key",
 ];
+/// Nur diese Endungen gelten als Binärdatei ohne Textzeilen (Bilder, Symbole, Schriften). Jede andere Datei wird
+/// als Text gelesen; enthält sie trotzdem NUL-Bytes, wird sie gemeldet statt still übersprungen.
+const BINARY_EXT: [&str; 12] = [
+    "png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "icns", "ttf", "otf", "woff", "woff2",
+];
 /// Erfundene Beispieldateien dürfen diese Endungen haben.
 const FIXTURE_DIR: &str = "testdata/erfunden/";
 
@@ -46,6 +51,41 @@ fn line_rules(line: &str, words: &[String], workflow: bool) -> Vec<&'static str>
         .collect()
 }
 
+/// UTF-16 in der gewählten Byte-Reihenfolge; kaputte Einheiten werden zu U+FFFD, damit der Rest lesbar bleibt.
+fn decode_utf16(bytes: &[u8], big_endian: bool) -> String {
+    let units = bytes.chunks(2).map(|p| {
+        let pair = [
+            p.first().copied().unwrap_or(0),
+            p.get(1).copied().unwrap_or(0),
+        ];
+        if big_endian {
+            u16::from_be_bytes(pair)
+        } else {
+            u16::from_le_bytes(pair)
+        }
+    });
+    char::decode_utf16(units)
+        .map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER))
+        .collect()
+}
+
+/// Text einer Datei in jeder Kodierung, die im Repo vorkommen kann: UTF-16 mit BOM (so schreibt Windows PowerShell 5.1),
+/// sonst UTF-8 mit Ersatzzeichen für ungültige Bytes (z. B. Windows-1252). NUL-Bytes werden entfernt, damit auch
+/// UTF-16 ohne BOM noch gelesen wird.
+pub fn decode_text(content: &[u8]) -> String {
+    let text = match content {
+        [0xFF, 0xFE, rest @ ..] => decode_utf16(rest, false),
+        [0xFE, 0xFF, rest @ ..] => decode_utf16(rest, true),
+        [0xEF, 0xBB, 0xBF, rest @ ..] => String::from_utf8_lossy(rest).into_owned(),
+        _ => String::from_utf8_lossy(content).into_owned(),
+    };
+    if text.contains('\0') {
+        text.replace('\0', "")
+    } else {
+        text
+    }
+}
+
 /// Prüft eine Datei. `path` mit `/` als Trenner, relativ zum Repository.
 pub fn scan_file(path: &str, content: &[u8], words: &[String]) -> Vec<Finding> {
     let mut rules: Vec<(usize, &'static str)> = Vec::new();
@@ -57,24 +97,31 @@ pub fn scan_file(path: &str, content: &[u8], words: &[String]) -> Vec<Finding> {
     if name == ".env" || name.starts_with(".env.") {
         rules.push((0, "env-datei"));
     }
-    if ext.is_some_and(|e| FORBIDDEN_EXT.contains(&e.as_str())) && !path.contains(FIXTURE_DIR) {
+    if ext.as_deref().is_some_and(|e| FORBIDDEN_EXT.contains(&e)) && !path.contains(FIXTURE_DIR) {
         rules.push((0, "verbotener-dateityp"));
     }
     if content.len() > MAX_FILE_BYTES {
         rules.push((0, "datei-ueber-1-mb"));
     }
-    // Binärdateien (Bilder, Symbole) haben keine Textzeilen.
-    let text = if content.contains(&0) {
-        None
-    } else {
-        std::str::from_utf8(content).ok()
-    };
+    // Bekannte Binärdateien (Bilder, Symbole, Schriften) haben keine Textzeilen; alles andere wird gelesen.
+    if ext.as_deref().is_some_and(|e| BINARY_EXT.contains(&e)) {
+        return to_findings(path, rules);
+    }
+    let utf16 = content.starts_with(&[0xFF, 0xFE]) || content.starts_with(&[0xFE, 0xFF]);
+    if !utf16 && content.contains(&0) {
+        rules.push((0, "unbekannte-binaerdatei"));
+    }
+    let text = decode_text(content);
     let workflow = path.starts_with(".github/workflows/");
-    for (i, line) in text.unwrap_or_default().lines().enumerate() {
+    for (i, line) in text.lines().enumerate() {
         for rule in line_rules(line, words, workflow) {
             rules.push((i.saturating_add(1), rule));
         }
     }
+    to_findings(path, rules)
+}
+
+fn to_findings(path: &str, rules: Vec<(usize, &'static str)>) -> Vec<Finding> {
     rules
         .into_iter()
         .map(|(line, rule)| Finding {
