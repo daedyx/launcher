@@ -1,5 +1,6 @@
 //! Lint-Einstellungen außerhalb des Quelltexts (SICHERHEIT Anhang A, B; Review M-2):
-//! - jedes Crate-Manifest nimmt genau die Workspace-Lints (`[lints] workspace = true`), ohne eigene Lockerung;
+//! - jedes Crate-Manifest nimmt genau die Workspace-Lints (`[lints] workspace = true`), sonst Stelle `manifest:lints`
+//!   (`manifest_allow`);
 //! - die Workspace-Lints behalten die Grundliste mindestens so streng; weitere `allow` sind Ausnahme-Stellen;
 //! - `clippy.toml`: Schlüssel außerhalb der Grundliste und fehlende Sperren sind Ausnahme-Stellen.
 //!
@@ -62,30 +63,6 @@ fn level(value: &str) -> u8 {
         Some("deny") => DENY,
         Some("warn") => WARN,
         _ => 0,
-    }
-}
-
-/// Probleme eines Crate-Manifests (nur Dateien mit `[package]`).
-pub fn crate_problems(path: &str, text: &str) -> Vec<String> {
-    let all = items(text);
-    if !all.iter().any(|i| i.key.starts_with("package.")) {
-        return Vec::new();
-    }
-    let lints: Vec<_> = all
-        .iter()
-        .filter(|i| i.key == "lints" || i.key.starts_with("lints."))
-        .collect();
-    let only_workspace = match lints.as_slice() {
-        [one] => {
-            (one.key == "lints.workspace" && one.value.trim() == "true")
-                || (one.key == "lints" && compact(&one.value) == "{workspace=true}")
-        }
-        _ => false,
-    };
-    if only_workspace {
-        Vec::new()
-    } else {
-        vec![format!("{path}: [lints] muss genau `workspace = true` enthalten, eigene Lint-Stufen sind nicht erlaubt")]
     }
 }
 

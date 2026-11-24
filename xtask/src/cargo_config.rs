@@ -50,10 +50,11 @@ pub fn is_toolchain_file(p: &str) -> bool {
 }
 
 /// Harte Verstöße einer Cargo-Konfigurationsdatei.
-pub fn config_problems(path: &str, text: &str) -> Vec<String> {
-    if path != ROOT_CONFIG {
+/// `ws`: Ordner des Cargo-Workspace ab der Repo-Wurzel (siehe `policy::collect`).
+pub fn config_problems(path: &str, ws: &str, text: &str) -> Vec<String> {
+    if path != format!("{ws}{ROOT_CONFIG}") {
         return vec![format!(
-            "{path}: nur {ROOT_CONFIG} im Wurzelordner ist erlaubt"
+            "{path}: nur {ws}{ROOT_CONFIG} im Workspace-Ordner ist erlaubt"
         )];
     }
     items(text)

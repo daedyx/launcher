@@ -122,3 +122,22 @@ fn role_addresses_and_obvious_placeholder_names_are_not_personal() {
     )));
     assert!(has_user_path(concat!("C:", "\\Users\\", "xy\\AppData")));
 }
+
+#[test]
+fn image_names_and_test_folders_are_no_personal_data() {
+    // Bildnamen für hohe Auflösung („@2x“) sehen aus wie Adressen, sind aber keine.
+    assert!(!has_real_mail("\"icons/128x128@2x.png\","));
+    assert!(!has_real_mail("logo@3x.webp und bild@2x.jpg"));
+    assert!(
+        has_real_mail(concat!("anna", "@", "beispiel.de")),
+        "echte Domains bleiben ein Fund"
+    );
+    // `test` ist ein Platzhalter wie `user`.
+    assert!(!has_user_path(
+        "save.mockResolvedValue(\"C:/Users/test/Protokoll.pdf\")"
+    ));
+    assert!(
+        has_user_path(concat!("C:/Users/", "anna/x")),
+        "echte Namen bleiben ein Fund"
+    );
+}

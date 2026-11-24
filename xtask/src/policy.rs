@@ -14,15 +14,20 @@ fn add(sites: &mut Sites, path: &str, rules: Vec<String>) {
     sites.extend(rules.into_iter().map(|r| (path.to_string(), r)));
 }
 
-/// `paths`: alle versionierten Dateien (mit `/`), `read`: Inhalt als Text.
-pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<String>) {
+/// `paths`: alle versionierten Dateien (mit `/`, ab der Repo-Wurzel), `ws`: Ordner des Cargo-Workspace ab der
+/// Repo-Wurzel mit `/` am Ende (leer, wenn beide gleich sind; in Desk `app/src-tauri/`), `read`: Inhalt als Text.
+pub fn collect(paths: &[String], ws: &str, read: impl Fn(&str) -> String) -> (Sites, Vec<String>) {
     let mut sites = Sites::new();
     let mut problems = Vec::new();
     for path in paths {
         let p = path.as_str();
         let name = file_name(p);
-        if name == "build.rs" {
-            // Ein Build-Skript führt beim Bauen eigenen Code aus, auch vor Clippy und Tests: nur mit Eintrag.
+        // Ein Build-Skript (`build.rs` neben einem `Cargo.toml`) führt beim Bauen eigenen Code aus, auch vor Clippy
+        // und Tests: nur mit Eintrag. Ein Modul, das `build.rs` heißt, ist keins.
+        let crate_root = p
+            .strip_suffix("build.rs")
+            .is_some_and(|dir| paths.iter().any(|q| *q == format!("{dir}Cargo.toml")));
+        if name == "build.rs" && crate_root {
             add(&mut sites, p, vec!["build.rs".to_string()]);
         }
         if p.ends_with(".rs") {
@@ -44,14 +49,19 @@ pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<S
         }
         if name == "Cargo.toml" {
             let text = read(p);
-            problems.extend(manifest::crate_problems(p, &text));
-            add(&mut sites, p, manifest::crate_sites(&text));
-        } else if (name == "clippy.toml" || name == ".clippy.toml") && p != "clippy.toml" {
+            add(
+                &mut sites,
+                p,
+                manifest::crate_sites(&text, p == format!("{ws}Cargo.toml")),
+            );
+        } else if (name == "clippy.toml" || name == ".clippy.toml")
+            && p != format!("{ws}clippy.toml")
+        {
             problems.push(format!(
                 "{p}: nur eine clippy.toml im Wurzelordner ist erlaubt (Clippy liest auch diese)"
             ));
         } else if cargo_config::is_config_file(p) {
-            problems.extend(cargo_config::config_problems(p, &read(p)));
+            problems.extend(cargo_config::config_problems(p, ws, &read(p)));
         } else if cargo_config::is_toolchain_file(p) {
             problems.push(format!(
                 "{p}: eigene Toolchain-Datei ist nicht erlaubt (die CI nagelt die Version fest)"
@@ -61,29 +71,30 @@ pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<S
         }
     }
     // Nur versionierte Dateien zählen; eine nicht eingecheckte Datei gilt als fehlend.
+    let at = |f: &str| format!("{ws}{f}");
     let root = |f: &str| {
-        if paths.iter().any(|p| p == f) {
-            read(f)
+        if paths.iter().any(|p| *p == at(f)) {
+            read(&at(f))
         } else {
             String::new()
         }
     };
     let (ws_problems, ws_sites) = manifest::workspace(&root("Cargo.toml"));
     problems.extend(ws_problems);
-    add(&mut sites, "Cargo.toml", ws_sites);
+    add(&mut sites, &at("Cargo.toml"), ws_sites);
     add(
         &mut sites,
-        "deny.toml",
+        &at("deny.toml"),
         deny_policy::sites(&root("deny.toml")),
     );
     add(
         &mut sites,
-        "clippy.toml",
+        &at("clippy.toml"),
         manifest::clippy_sites(&root("clippy.toml")),
     );
     add(
         &mut sites,
-        ".cargo/audit.toml",
+        &at(".cargo/audit.toml"),
         deny_policy::audit_sites(&root(".cargo/audit.toml")),
     );
     (sites, problems)

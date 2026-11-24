@@ -4,7 +4,7 @@ const BASE: &str = "# Kommentar\n[alias]\nxtask = \"run --quiet --package xtask 
 
 #[test]
 fn only_the_xtask_alias_is_allowed() {
-    assert!(config_problems(".cargo/config.toml", BASE).is_empty());
+    assert!(config_problems(".cargo/config.toml", "", BASE).is_empty());
     let hostile = [
         "[target.x86_64-pc-windows-msvc]\nrunner = \"tools/ok.cmd\"\n",
         "[target.'cfg(windows)']\nrunner = \"tools/ok.cmd\"\n",
@@ -19,11 +19,13 @@ fn only_the_xtask_alias_is_allowed() {
     ];
     for h in hostile {
         assert!(
-            !config_problems(".cargo/config.toml", &format!("{BASE}{h}")).is_empty(),
+            !config_problems(".cargo/config.toml", "", &format!("{BASE}{h}")).is_empty(),
             "{h}"
         );
     }
-    assert!(!config_problems(".cargo/config.toml", "[alias]\nxtask = \"version\"\n").is_empty());
+    assert!(
+        !config_problems(".cargo/config.toml", "", "[alias]\nxtask = \"version\"\n").is_empty()
+    );
 }
 
 #[test]
@@ -33,7 +35,7 @@ fn config_files_elsewhere_and_toolchain_files_are_red() {
         ".cargo/config",
         "xtask/.cargo/config",
     ] {
-        assert!(!config_problems(p, BASE).is_empty(), "{p}");
+        assert!(!config_problems(p, "", BASE).is_empty(), "{p}");
     }
     for p in [
         "rust-toolchain",

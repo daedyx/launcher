@@ -61,10 +61,10 @@ fn run_scan(src: files::Source) -> Result<String, Vec<String>> {
     Err(out)
 }
 
-fn run_exceptions(src: files::Source) -> Result<String, Vec<String>> {
+fn run_exceptions(src: files::Source, ws: &str) -> Result<String, Vec<String>> {
     let paths = src.paths().map_err(|e| vec![e])?;
     let read = |p: &str| scan::decode_text(&src.content(p).unwrap_or_default());
-    let (sites, mut problems) = policy::collect(&paths, read);
+    let (sites, mut problems) = policy::collect(&paths, ws, read);
     let table = read(exceptions::TABLE);
     problems.extend(exceptions::check(
         &sites,
@@ -72,8 +72,8 @@ fn run_exceptions(src: files::Source) -> Result<String, Vec<String>> {
         &date::today(),
     ));
     problems.extend(exceptions::mirror_problems(
-        &read("deny.toml"),
-        &read(".cargo/audit.toml"),
+        &read(&format!("{ws}deny.toml")),
+        &read(&format!("{ws}.cargo/audit.toml")),
     ));
     if problems.is_empty() {
         Ok(format!(
@@ -86,16 +86,24 @@ fn run_exceptions(src: files::Source) -> Result<String, Vec<String>> {
 }
 
 /// `testzahl <protokoll>`: Protokoll von `cargo test` gegen die Mindestzahlen (aus `HEAD` mit `--head`).
-fn run_testcount(args: &[String], src: files::Source) -> Result<String, Vec<String>> {
+fn run_testcount(
+    args: &[String],
+    src: files::Source,
+    ws: &str,
+    start: &std::path::Path,
+) -> Result<String, Vec<String>> {
     let log_path = args
         .iter()
         .skip(1)
         .find(|a| !a.starts_with("--"))
         .ok_or_else(|| vec!["testzahl: Protokoll-Datei fehlt".to_string()])?;
-    let log = scan::decode_text(
-        &std::fs::read(log_path).map_err(|_| vec![format!("testzahl: {log_path} nicht lesbar")])?,
+    let raw = std::fs::read(start.join(log_path))
+        .map_err(|_| vec![format!("testzahl: {log_path} nicht lesbar")])?;
+    let log = scan::decode_text(&raw);
+    let floor = scan::decode_text(
+        &src.content(&format!("{ws}{}", testcount::FLOOR))
+            .unwrap_or_default(),
     );
-    let floor = scan::decode_text(&src.content(testcount::FLOOR).unwrap_or_default());
     let problems = testcount::check(&log, &floor);
     if problems.is_empty() {
         let n: u64 = testcount::counts(&log)
@@ -118,10 +126,19 @@ fn run_testcount(args: &[String], src: files::Source) -> Result<String, Vec<Stri
 )]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let result = match args.first().map(String::as_str) {
-        Some("scan") => run_scan(files::Source::from_args(&args)),
-        Some("exceptions") => run_exceptions(files::Source::from_args(&args)),
-        Some("testzahl") => run_testcount(&args, files::Source::from_args(&args)),
+    // Gestartet wird im Cargo-Workspace; geprüft wird ab der Repo-Wurzel (in Desk liegt der Workspace darunter).
+    let start = std::env::current_dir().unwrap_or_default();
+    let located = files::workspace_prefix().and_then(|ws| {
+        let top = files::toplevel()?;
+        std::env::set_current_dir(&top).map_err(|_| "Repo-Wurzel nicht erreichbar".to_string())?;
+        Ok(ws)
+    });
+    let src = files::Source::from_args(&args);
+    let result = match (located, args.first().map(String::as_str)) {
+        (Err(e), _) => Err(vec![e]),
+        (Ok(_), Some("scan")) => run_scan(src),
+        (Ok(ws), Some("exceptions")) => run_exceptions(src, &ws),
+        (Ok(ws), Some("testzahl")) => run_testcount(&args, src, &ws, &start),
         _ => {
             Err(vec!["Aufruf: xtask scan [--staged|--head] | exceptions [--head] | testzahl <protokoll> [--head]"
                 .to_string()])

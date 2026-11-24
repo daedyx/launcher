@@ -8,4 +8,4 @@
 1 unittests src/bin/demo_catalog.rs (demo_catalog)
 4 tests/catalog_tool.rs (catalog_tool)
 6 tests/e2e.rs (e2e)
-59 unittests src/main.rs (xtask)
+64 unittests src/main.rs (xtask)

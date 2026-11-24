@@ -87,3 +87,18 @@ impl Source {
         }
     }
 }
+
+/// Ordner des Cargo-Workspace ab der Repo-Wurzel, mit `/` am Ende (leer an der Wurzel). Das Werkzeug wird im
+/// Workspace-Ordner gestartet (`cargo xtask …`); in Desk ist das `app/src-tauri/`.
+pub fn workspace_prefix() -> Result<String, String> {
+    let raw = git(&["rev-parse", "--show-prefix"])?;
+    Ok(String::from_utf8_lossy(&raw).trim().to_string())
+}
+
+/// Wurzel des Repositorys (alle Pfade der Prüfungen gelten ab hier).
+pub fn toplevel() -> Result<std::path::PathBuf, String> {
+    let raw = git(&["rev-parse", "--show-toplevel"])?;
+    Ok(std::path::PathBuf::from(
+        String::from_utf8_lossy(&raw).trim(),
+    ))
+}

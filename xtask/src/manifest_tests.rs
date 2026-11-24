@@ -3,29 +3,43 @@ use super::*;
 const CRATE: &str =
     "[package]\nname = \"a\"\n\n[dependencies]\nx = \"1\"\n\n[lints]\nworkspace = true\n";
 
+/// Eigene Lint-Stufen eines Crates sind eine Ausnahme-Stelle `manifest:lints` (Eintrag mit Ja des Betreuers), damit
+/// begründete Fälle wie ein `*-sys`-Crate mit `unsafe` oder eine alte Hülle (Desk E6) eingetragen werden können.
 #[test]
 fn crate_manifest_must_use_the_workspace_lints_only() {
-    assert!(crate_problems("crates/a/Cargo.toml", CRATE).is_empty());
-    assert!(crate_problems(
-        "crates/a/Cargo.toml",
-        "lints = { workspace = true }\n[package]\nname = \"a\"\n"
-    )
-    .is_empty());
+    let lints = |t: &str| {
+        crate_sites(t, false)
+            .into_iter()
+            .filter(|s| s == "manifest:lints")
+            .count()
+    };
+    assert_eq!(lints(CRATE), 0);
+    assert_eq!(
+        lints("lints = { workspace = true }\n[package]\nname = \"a\"\n"),
+        0
+    );
     assert!(
-        crate_problems("Cargo.toml", "[workspace]\nmembers = []\n").is_empty(),
+        crate_sites("[workspace]\nmembers = []\n", false).is_empty(),
         "ohne [package] nichts zu prüfen"
     );
-    let missing = crate_problems("crates/a/Cargo.toml", "[package]\nname = \"a\"\n");
-    assert_eq!(missing.len(), 1, "{missing:?}");
-    let own = format!("{CRATE}\n[lints.clippy]\nunwrap_used = \"allow\"\n");
-    assert_eq!(crate_problems("crates/a/Cargo.toml", &own).len(), 1);
-    let replaced = CRATE.replace("workspace = true", "workspace = false");
-    assert_eq!(crate_problems("crates/a/Cargo.toml", &replaced).len(), 1);
-    let only_own = CRATE.replace(
-        "[lints]\nworkspace = true",
-        "[lints.rust]\nunsafe_code = \"allow\"",
+    assert_eq!(lints("[package]\nname = \"a\"\n"), 1, "fehlt");
+    assert_eq!(
+        lints(&format!(
+            "{CRATE}\n[lints.clippy]\nunwrap_used = \"allow\"\n"
+        )),
+        1
     );
-    assert!(!crate_problems("crates/a/Cargo.toml", &only_own).is_empty());
+    assert_eq!(
+        lints(&CRATE.replace("workspace = true", "workspace = false")),
+        1
+    );
+    assert_eq!(
+        lints(&CRATE.replace(
+            "[lints]\nworkspace = true",
+            "[lints.rust]\nunsafe_code = \"allow\""
+        )),
+        1
+    );
 }
 
 const WORKSPACE: &str = r#"[workspace]
@@ -148,9 +162,9 @@ workspace = true
 #[test]
 fn crate_settings_outside_the_allowlist_need_an_entry() {
     assert!(
-        crate_sites(FULL_CRATE).is_empty(),
+        crate_sites(FULL_CRATE, false).is_empty(),
         "{:?}",
-        crate_sites(FULL_CRATE)
+        crate_sites(FULL_CRATE, false)
     );
     for (extra, want) in [
         ("[lib]\ntest = false\n", "manifest:lib.test"),
@@ -178,7 +192,7 @@ fn crate_settings_outside_the_allowlist_need_an_entry() {
         ),
     ] {
         assert_eq!(
-            crate_sites(&format!("{FULL_CRATE}{extra}")),
+            crate_sites(&format!("{FULL_CRATE}{extra}"), false),
             vec![want.to_string()],
             "{extra}"
         );
@@ -187,7 +201,7 @@ fn crate_settings_outside_the_allowlist_need_an_entry() {
         "publish = false\nautotests = false\n",
         "publish = false\nbuild = \"build.rs\"\n",
     ] {
-        let got = crate_sites(&FULL_CRATE.replace("publish = false\n", to));
+        let got = crate_sites(&FULL_CRATE.replace("publish = false\n", to), false);
         assert_eq!(got.len(), 1, "{to} {got:?}");
         assert!(
             got.iter()
@@ -215,4 +229,33 @@ fn workspace_settings_outside_the_allowlist_need_an_entry() {
     assert_eq!(s, vec!["manifest:workspace.exclude"]);
     let (_, s) = workspace(&base.replace("overflow-checks = true", "overflow-checks = false"));
     assert_eq!(s, vec!["manifest:profile.release.overflow-checks=false"]);
+}
+
+#[test]
+fn release_optimisation_switches_are_allowed_but_not_weakening_ones() {
+    let base = format!(
+        "{WORKSPACE}\n[profile.release]\ncodegen-units = 1\nlto = true\nopt-level = 3\npanic = \"abort\"\nstrip = true\noverflow-checks = true\ndebug = false\n"
+    );
+    let (_, s) = workspace(&base);
+    assert!(s.is_empty(), "{s:?}");
+    for (from, to, want) in [
+        (
+            "panic = \"abort\"",
+            "panic = \"unwind\"",
+            "manifest:profile.release.panic=unwind",
+        ),
+        (
+            "strip = true",
+            "strip = false",
+            "manifest:profile.release.strip=false",
+        ),
+        (
+            "debug = false",
+            "debug = true",
+            "manifest:profile.release.debug=true",
+        ),
+    ] {
+        let (_, s) = workspace(&base.replace(from, to));
+        assert_eq!(s, vec![want.to_string()], "{to}");
+    }
 }

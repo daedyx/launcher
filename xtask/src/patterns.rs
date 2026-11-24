@@ -12,10 +12,12 @@ const ALLOWED_MAIL_DOMAINS: [&str; 5] = [
 const ALLOWED_MAIL_ENDINGS: [&str; 4] = [".example", ".test", ".invalid", ".localhost"];
 /// Platzhalter nach `Users/` oder `home/`, die keinen echten Benutzer nennen.
 /// Dazu gilt jeder einzelne Buchstabe als Platzhalter (`C:\Users\x`).
-const PATH_PLACEHOLDERS: [&str; 10] = [
+const PATH_PLACEHOLDERS: [&str; 11] = [
     "public", "default", "name", "user", "username", "runner", "benutzer", "me", "beispiel",
-    "example",
+    "example", "test",
 ];
+/// Bildnamen für hohe Auflösung (`icon@2x.png`) haben die Form einer Adresse; diese Endungen sind keine Domains.
+const IMAGE_ENDINGS: [&str; 7] = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"];
 /// Rollen-Adressen ohne Person dahinter.
 const ROLE_LOCAL_PARTS: [&[u8]; 2] = [b"noreply", b"no-reply"];
 const TOKEN_PREFIXES: [&str; 10] = [
@@ -77,7 +79,13 @@ pub fn has_real_mail(line: &str) -> bool {
             let role = ROLE_LOCAL_PARTS
                 .iter()
                 .any(|r| local.eq_ignore_ascii_case(r));
-            !role && !(local == b"git" && domain == "github.com") && !mail_domain_allowed(domain)
+            let image = IMAGE_ENDINGS
+                .iter()
+                .any(|e| domain.to_ascii_lowercase().ends_with(e));
+            !role
+                && !image
+                && !(local == b"git" && domain == "github.com")
+                && !mail_domain_allowed(domain)
         })
 }
 
