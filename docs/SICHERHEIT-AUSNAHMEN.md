@@ -74,8 +74,10 @@ in einer Zeile (Reihenfolge egal). Mögliche Regeln:
   `RUSTC_BOOTSTRAP`, `RUSTUP_TOOLCHAIN`, `CLIPPY_CONF_DIR`, `CARGO_HOME`, `CARGO_BUILD_*`, `CARGO_TARGET_*`,
   `CARGO_PROFILE_*`, `CARGO_ALIAS_*` u. ä.; `workflow:--config`, `workflow:--cap-lints`, `workflow:cargo +`.
 
-Ohne Ausnahme-Weg rot: ein Crate-Manifest ohne `[lints] workspace = true` oder mit eigenen Lint-Stufen, Workspace-Lints
-schwächer als die Grundliste, eine zweite `clippy.toml`; in `.cargo/config.toml` jeder Schlüssel außer dem
+Ein Crate-Manifest ohne `[lints] workspace = true` oder mit eigenen Lint-Stufen ist die Stelle `manifest:lints` (nur
+mit Eintrag, z. B. für ein `*-sys`-Crate mit `unsafe`). Ein `build.rs` zählt nur neben einem `Cargo.toml` (Build-Skript).
+
+Ohne Ausnahme-Weg rot: Workspace-Lints schwächer als die Grundliste, eine zweite `clippy.toml`; in `.cargo/config.toml` jeder Schlüssel außer dem
 `xtask`-Alias (z. B. `runner`, `rustc-wrapper`, `rustflags`, `linker`, `[env]`), jede weitere Cargo-Konfigurationsdatei
 und jede `rust-toolchain`-Datei; mehrzeilige Texte (`"""`, `'''`) und doppelte Schlüssel in Prüf-TOML; Attribute aus
 Makro-Platzhaltern (`#[$m]`). Der Ablauf liegt höchstens 12 Monate nach dem Eintragsdatum,

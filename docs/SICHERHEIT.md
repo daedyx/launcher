@@ -53,7 +53,7 @@ zeilenweise geprüft.
 `docs/SICHERHEIT-AUSNAHMEN.md` (Einzelheiten dort): `allow`/`expect` auch in `cfg_attr`, mit Leerzeichen und über
 mehrere Zeilen, `#[ignore]`, `unsafe`; in `deny.toml` jede Abweichung von der festgehaltenen Grundliste (u. a.
 `yanked`, `unmaintained`, `unknown-git`, `allow-git`, neue Lizenzen, `skip`/`skip-tree`); Lockerungen in
-`clippy.toml`, `.cargo/audit.toml` und Workflows. Jedes Crate muss `[lints] workspace = true` haben, und eine
+`clippy.toml`, `.cargo/audit.toml` und Workflows. Jedes Crate braucht `[lints] workspace = true` (sonst Stelle `manifest:lints`), und eine
 Ausnahme läuft höchstens 12 Monate. Hart rot sind außerdem: in `.cargo/config.toml` alles außer dem `xtask`-Alias
 (ein `runner` oder `rustc-wrapper` könnte Tests und Prüfprogramme abschalten), weitere Cargo-Konfigurationen und
 `rust-toolchain`-Dateien, mehrzeilige Texte und doppelte Schlüssel in den geprüften TOML-Dateien sowie Attribute aus
