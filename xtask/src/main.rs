@@ -2,13 +2,18 @@
 //! - `cargo xtask scan` prüft alle versionierten Dateien, `--staged` nur die vorgemerkten (Pre-Commit-Haken).
 //! - `cargo xtask exceptions` vergleicht Ausnahmen im Code mit `docs/SICHERHEIT-AUSNAHMEN.md`.
 mod date;
+mod deny_policy;
 mod exceptions;
 mod files;
+mod manifest;
 mod patterns;
+mod policy;
+mod rust_attrs;
+mod rust_tokens;
 mod scan;
+mod toml_lite;
 mod wordlist;
 
-use std::collections::BTreeMap;
 use std::process::ExitCode;
 
 fn run_scan(staged: bool) -> Result<String, Vec<String>> {
@@ -59,24 +64,15 @@ fn run_scan(staged: bool) -> Result<String, Vec<String>> {
 }
 
 fn run_exceptions() -> Result<String, Vec<String>> {
-    let mut found: BTreeMap<String, usize> = BTreeMap::new();
-    for path in files::tracked().map_err(|e| vec![e])? {
-        let text = String::from_utf8(files::worktree_content(&path).unwrap_or_default())
-            .unwrap_or_default();
-        let n = if path.ends_with(".rs") {
-            exceptions::count_rust(&text)
-        } else if path == "deny.toml" {
-            exceptions::count_deny(&text)
-        } else {
-            0
-        };
-        if n > 0 {
-            found.insert(path, n);
-        }
-    }
-    let table = std::fs::read_to_string(exceptions::TABLE).unwrap_or_default();
-    let mut problems = exceptions::check(&found, &exceptions::parse_table(&table), &date::today());
-    let read = |p: &str| std::fs::read_to_string(p).unwrap_or_default();
+    let paths = files::tracked().map_err(|e| vec![e])?;
+    let read = |p: &str| scan::decode_text(&files::worktree_content(p).unwrap_or_default());
+    let (sites, mut problems) = policy::collect(&paths, read);
+    let table = read(exceptions::TABLE);
+    problems.extend(exceptions::check(
+        &sites,
+        &exceptions::parse_table(&table),
+        &date::today(),
+    ));
     problems.extend(exceptions::mirror_problems(
         &read("deny.toml"),
         &read(".cargo/audit.toml"),
@@ -84,7 +80,7 @@ fn run_exceptions() -> Result<String, Vec<String>> {
     if problems.is_empty() {
         Ok(format!(
             "exceptions: {} Ausnahme-Stelle(n), alle eingetragen und gültig.",
-            found.values().sum::<usize>()
+            sites.len()
         ))
     } else {
         Err(problems)

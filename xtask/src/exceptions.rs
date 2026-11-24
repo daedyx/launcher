@@ -1,20 +1,9 @@
-//! Ausnahmenzähler (SICHERHEIT Anhang B.4): Stellen im Code gegen `docs/SICHERHEIT-AUSNAHMEN.md`.
-//! Rot, wenn eine Datei mehr oder weniger Stellen hat als Einträge, oder ein Eintrag abgelaufen ist.
+//! Ausnahmenzähler (SICHERHEIT Anhang B.4): Ausnahme-Stellen (siehe `policy`) gegen `docs/SICHERHEIT-AUSNAHMEN.md`.
+//! Verglichen wird Datei **und Regel**, nicht nur die Anzahl. Rot, wenn eine Stelle keinen passenden Eintrag hat oder
+//! umgekehrt, wenn ein Datum fehlt, in der Zukunft liegt, abgelaufen ist oder mehr als 12 Monate Laufzeit hat.
 use std::collections::BTreeMap;
 
 pub const TABLE: &str = "docs/SICHERHEIT-AUSNAHMEN.md";
-
-/// Muster werden zusammengesetzt, damit diese Datei sich nicht selbst zählt.
-const RUST_MARKERS: [&str; 8] = [
-    concat!("#[", "allow("),
-    concat!("#![", "allow("),
-    concat!("#[", "expect("),
-    concat!("#![", "expect("),
-    concat!("#[", "ignore"),
-    concat!("unsafe", " {"),
-    concat!("unsafe", " fn"),
-    concat!("unsafe", " impl"),
-];
 
 /// Ein Eintrag der Tabelle: Datei, Regel und Ablaufdatum `JJJJ-MM-TT`. Regeln `scan:<regel>` erlauben einen
 /// Scan-Fund in genau dieser Datei (z. B. eine Altlast, deren Ablösung beschlossen ist) und zählen nicht als Code-Stelle.
@@ -22,13 +11,69 @@ const RUST_MARKERS: [&str; 8] = [
 pub struct Entry {
     pub path: String,
     pub rule: String,
+    pub date: String,
     pub expires: String,
 }
 
+/// Höchstlaufzeit einer Ausnahme ab dem Eintragsdatum, in Jahren (SICHERHEIT 5.7, Review M-2 Nr. 5).
+const MAX_YEARS: u32 = 1;
+
+/// `JJJJ-MM-TT` mit gültigem Monat und Tag.
+fn is_date(d: &str) -> bool {
+    let b = d.as_bytes();
+    let num = |r: std::ops::Range<usize>| {
+        d.get(r)
+            .filter(|x| x.bytes().all(|c| c.is_ascii_digit()))
+            .and_then(|x| x.parse::<u32>().ok())
+    };
+    b.len() == 10
+        && b.get(4) == Some(&b'-')
+        && b.get(7) == Some(&b'-')
+        && num(0..4).is_some()
+        && num(5..7).is_some_and(|m| (1..=12).contains(&m))
+        && num(8..10).is_some_and(|t| (1..=31).contains(&t))
+}
+
+/// Spätestes erlaubtes Ablaufdatum: gleicher Tag `MAX_YEARS` Jahre nach dem Eintrag.
+fn latest_expiry(date: &str) -> Option<String> {
+    let year: u32 = date.get(0..4)?.parse().ok()?;
+    Some(format!(
+        "{:04}{}",
+        year.checked_add(MAX_YEARS)?,
+        date.get(4..)?
+    ))
+}
+
 fn valid_until(e: &Entry, today: &str) -> bool {
-    e.expires.len() == 10
-        && e.expires.bytes().filter(|c| *c == b'-').count() == 2
-        && e.expires.as_str() >= today
+    is_date(&e.expires) && e.expires.as_str() >= today
+}
+
+/// Datumsfehler eines Eintrags (leer = gültig).
+fn date_problems(e: &Entry, today: &str) -> Vec<String> {
+    let p = &e.path;
+    if !is_date(&e.date) || !is_date(&e.expires) {
+        return vec![format!(
+            "{p}: Datum oder Ablauf fehlt oder ist kein JJJJ-MM-TT ({})",
+            e.rule
+        )];
+    }
+    let mut out = Vec::new();
+    if e.date.as_str() > today {
+        out.push(format!(
+            "{p}: Eintragsdatum {} liegt in der Zukunft",
+            e.date
+        ));
+    }
+    if e.expires.as_str() < today {
+        out.push(format!("{p}: Ausnahme ist am {} abgelaufen", e.expires));
+    }
+    if latest_expiry(&e.date).is_none_or(|max| e.expires > max) {
+        out.push(format!(
+            "{p}: Ablauf {} liegt mehr als 12 Monate nach dem Eintrag {}",
+            e.expires, e.date
+        ));
+    }
+    out
 }
 
 /// Erlaubte Scan-Funde (Datei, Regel) aus gültigen `scan:`-Zeilen.
@@ -56,37 +101,11 @@ pub fn parse_table(md: &str) -> Vec<Entry> {
             Some(Entry {
                 path: cells.get(2)?.to_string(),
                 rule: cells.get(3)?.to_string(),
+                date: cells.get(6)?.to_string(),
                 expires: cells.get(7)?.to_string(),
             })
         })
         .collect()
-}
-
-/// Stellen in Rust-Quelltext; Kommentarzeilen zählen nicht.
-pub fn count_rust(text: &str) -> usize {
-    text.lines()
-        .map(str::trim_start)
-        .filter(|l| !l.starts_with("//"))
-        .map(|l| {
-            RUST_MARKERS
-                .iter()
-                .map(|m| l.matches(m).count())
-                .sum::<usize>()
-        })
-        .sum()
-}
-
-/// Ausnahmen in `deny.toml`, nicht auskommentiert: Meldungen (`id = "RUSTSEC-…"`) und Lizenz-Ausnahmen je Crate
-/// (`{ crate = "…", allow = [...] }`, eine je Zeile).
-pub fn count_deny(text: &str) -> usize {
-    text.lines()
-        .map(str::trim_start)
-        .filter(|l| !l.starts_with('#'))
-        .filter(|l| {
-            l.contains(concat!("\"RUST", "SEC-"))
-                || (l.contains("crate =") && l.contains("allow ="))
-        })
-        .count()
 }
 
 /// Alle Meldungs-Kennungen `RUSTSEC-JJJJ-NNNN` in nicht auskommentierten Zeilen.
@@ -116,42 +135,53 @@ pub fn mirror_problems(deny: &str, audit: &str) -> Vec<String> {
     }
 }
 
-/// Probleme (leer = grün). `found`: Datei → Anzahl Stellen (nur Dateien mit mindestens einer Stelle).
-pub fn check(found: &BTreeMap<String, usize>, entries: &[Entry], today: &str) -> Vec<String> {
-    let mut listed: BTreeMap<&str, usize> = BTreeMap::new();
+/// Regel vergleichbar machen: Backticks und Erläuterung in Klammern (` (…)`) weg, Leerraum weg, klein geschrieben,
+/// mehrere Regeln (durch Komma getrennt) sortiert. So passt die Tabellenzelle zur Stelle im Code.
+pub fn normalize_rule(cell: &str) -> String {
+    let plain = cell.replace('`', "");
+    let core = plain.split(" (").next().unwrap_or_default();
+    let mut parts: Vec<String> = core
+        .split(',')
+        .map(|p| {
+            p.chars()
+                .filter(|c| !c.is_whitespace())
+                .collect::<String>()
+                .to_lowercase()
+        })
+        .filter(|p| !p.is_empty())
+        .collect();
+    parts.sort();
+    parts.join(",")
+}
+
+/// Probleme (leer = grün). `sites`: (Datei, Regel) je Ausnahme-Stelle.
+pub fn check(sites: &[(String, String)], entries: &[Entry], today: &str) -> Vec<String> {
+    let mut balance: BTreeMap<(String, String), i64> = BTreeMap::new();
+    for (path, rule) in sites {
+        let n = balance
+            .entry((path.clone(), normalize_rule(rule)))
+            .or_insert(0);
+        *n = n.saturating_add(1);
+    }
     let mut problems = Vec::new();
     for e in entries {
         if !e.rule.starts_with("scan:") {
-            let n = listed.entry(e.path.as_str()).or_insert(0);
-            *n = n.saturating_add(1);
+            let n = balance
+                .entry((e.path.clone(), normalize_rule(&e.rule)))
+                .or_insert(0);
+            *n = n.saturating_sub(1);
         }
-        let valid_date =
-            e.expires.len() == 10 && e.expires.bytes().filter(|c| *c == b'-').count() == 2;
-        if !valid_date {
-            problems.push(format!(
-                "{}: Ablaufdatum fehlt oder ist kein JJJJ-MM-TT",
-                e.path
-            ));
-        } else if e.expires.as_str() < today {
-            problems.push(format!(
-                "{}: Ausnahme ist am {} abgelaufen",
-                e.path, e.expires
-            ));
-        }
+        problems.extend(date_problems(e, today));
     }
-    let paths: std::collections::BTreeSet<&str> = found
-        .keys()
-        .map(String::as_str)
-        .chain(listed.keys().copied())
-        .collect();
-    for p in paths {
-        let (have, allowed) = (
-            found.get(p).copied().unwrap_or(0),
-            listed.get(p).copied().unwrap_or(0),
-        );
-        if have != allowed {
+    for ((path, rule), n) in balance {
+        if n > 0 {
             problems.push(format!(
-                "{p}: {have} Ausnahme-Stelle(n) im Code, {allowed} Eintrag/Einträge in {TABLE}"
+                "{path}: {n} Ausnahme-Stelle(n) „{rule}“ ohne passenden Eintrag in {TABLE}"
+            ));
+        } else if n < 0 {
+            problems.push(format!(
+                "{path}: {} Eintrag/Einträge „{rule}“ ohne passende Stelle",
+                n.saturating_neg()
             ));
         }
     }
