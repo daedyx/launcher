@@ -1,0 +1,24 @@
+# Sicherheitsdateien (docs/SICHERHEIT.md 5.7 Nr. 3): Änderungen brauchen das Review des Projektkontos.
+# Eigentümer ist ein Team der Organisation, keine Person. Die Datei wirkt erst, wenn das Team @daedyx/sicherheit
+# existiert, Schreibrechte hat und der Branch-Schutz „Review von Code-Ownern“ verlangt (GitHub-Einstellungen,
+# beim Betreuer).
+
+# Prüf-Tor: Workflows, Haken, Cargo-Konfiguration, Prüfwerkzeug samt Erlaubnislisten und Mindestzahlen
+/.github/                       @daedyx/sicherheit
+/.githooks/                     @daedyx/sicherheit
+/.cargo/                        @daedyx/sicherheit
+/xtask/                         @daedyx/sicherheit
+
+# Lints, Lieferkette und Formatregeln
+/deny.toml                      @daedyx/sicherheit
+/clippy.toml                    @daedyx/sicherheit
+/rustfmt.toml                   @daedyx/sicherheit
+/.gitattributes                 @daedyx/sicherheit
+
+# Manifeste (Lints, Ziele, [patch]) und Build-Skripte, in jedem Ordner
+Cargo.toml                      @daedyx/sicherheit
+build.rs                        @daedyx/sicherheit
+
+# Regeln und Ausnahmen
+/docs/SICHERHEIT*.md            @daedyx/sicherheit
+/SECURITY.md                    @daedyx/sicherheit
