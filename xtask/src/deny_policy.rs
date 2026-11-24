@@ -2,7 +2,7 @@
 //! abweicht oder dort nicht vorkommt, braucht einen Eintrag in der Tabelle: Meldungen in `ignore`, gelockerte feste
 //! Werte (`yanked`, `unmaintained`, `unknown-git`, …), neue Lizenzen, Git-Quellen, `skip`/`skip-tree`, Lizenz-Ausnahmen
 //! und jeder unbekannte Schlüssel. Die Grundliste zu ändern heißt, dieses Werkzeug zu ändern (Sicherheitsdatei).
-use crate::toml_lite::{compact, elements, field, items, strings, unquote, Item};
+use crate::toml_lite::{compact, elements, field, items, split_top, strings, unquote, Item};
 
 /// Lizenzen, die mit MIT verträglich sind (SICHERHEIT Anhang C, Stand 2026-11-23).
 const BASE_LICENSES: [&str; 13] = [
@@ -74,6 +74,31 @@ fn licence_exception(element: &str) -> String {
     )
 }
 
+/// Einengungen eines Eintrags in `bans.deny`.
+fn ban_narrowing(element: &str) -> Vec<String> {
+    let name = name_of(element);
+    let mut out = Vec::new();
+    if name.contains('@') {
+        out.push(format!("bans.deny-version={name}"));
+    }
+    if let Some(inner) = element
+        .trim()
+        .strip_prefix('{')
+        .and_then(|x| x.strip_suffix('}'))
+    {
+        for part in split_top(inner, ',') {
+            let key = unquote(part.split_once('=').map_or(part.as_str(), |(k, _)| k));
+            if !matches!(key.as_str(), "name" | "crate" | "reason") {
+                out.push(format!(
+                    "bans.deny-feld={}:{key}",
+                    name.split('@').next().unwrap_or_default()
+                ));
+            }
+        }
+    }
+    out
+}
+
 fn fixed_sites(all: &[Item]) -> Vec<String> {
     let mut out = Vec::new();
     for (key, allowed) in FIXED {
@@ -107,13 +132,9 @@ fn fixed_sites(all: &[Item]) -> Vec<String> {
             out.push(format!("bans.deny-fehlt={b}"));
         }
     }
-    // Ein „Wrapper“ darf ein verbotenes Crate doch benutzen: das ist eine Lockerung.
-    out.extend(
-        banned
-            .iter()
-            .filter(|e| field(e, "wrappers").is_some())
-            .map(|e| format!("bans.deny-wrappers={}", name_of(e))),
-    );
+    // Ein Verbot gilt nur ganz: jedes Zusatzfeld (`version`, `wrappers`, `use-instead`, …) und jede Version im Namen
+    // engt es ein und ist eine Lockerung (Review Prüflücken M-3).
+    out.extend(banned.iter().flat_map(|e| ban_narrowing(e)));
     out
 }
 

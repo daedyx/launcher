@@ -108,7 +108,7 @@ fn bans_skip_and_unknown_keys_are_sites() {
         "{ name = \"openssl\", wrappers = [\"w\"] }",
     );
     assert!(
-        wrapped.contains(&"bans.deny-wrappers=openssl".to_string()),
+        wrapped.contains(&"bans.deny-feld=openssl:wrappers".to_string()),
         "{wrapped:?}"
     );
     let section = sites(&format!(
@@ -149,5 +149,41 @@ fn audit_toml_may_only_list_ignores() {
             "advisories.informational_warnings=[]",
             "yanked.enabled=false"
         ]
+    );
+}
+
+#[test]
+fn banned_crates_may_not_be_narrowed() {
+    for (from, to, want) in [
+        (
+            "{ name = \"openssl\", reason = \"x\" }",
+            "{ name = \"openssl\", version = \"=0.0.1\", reason = \"x\" }",
+            "bans.deny-feld=openssl:version",
+        ),
+        (
+            "{ name = \"openssl\", reason = \"x\" }",
+            "{ name = \"openssl@0.0.1\", reason = \"x\" }",
+            "bans.deny-version=openssl@0.0.1",
+        ),
+        (
+            "{ name = \"native-tls\", reason = \"x\" }",
+            "{ name = \"native-tls\", use-instead = \"rustls\", reason = \"x\" }",
+            "bans.deny-feld=native-tls:use-instead",
+        ),
+        (
+            "{ name = \"native-tls\", reason = \"x\" }",
+            "\"native-tls@0.1\"",
+            "bans.deny-version=native-tls@0.1",
+        ),
+    ] {
+        let got = with(from, to);
+        assert!(got.contains(&want.to_string()), "{want} {got:?}");
+    }
+    assert_eq!(
+        with(
+            "{ name = \"openssl\", reason = \"x\" }",
+            "{ crate = \"openssl\", reason = \"x\" }"
+        ),
+        vec!["RUSTSEC-2026-0001"]
     );
 }

@@ -33,11 +33,8 @@ fn every_kind_of_file_is_checked() {
         "{sites:?}"
     );
     assert!(
-        sites.contains(&(
-            ".cargo/config.toml".to_string(),
-            "build.rustflags".to_string()
-        )),
-        "{sites:?}"
+        problems.iter().any(|m| m.starts_with(".cargo/config.toml")),
+        "{problems:?}"
     );
     // Fehlen deny.toml und clippy.toml, fehlen alle Sperren: das sind Stellen ohne Eintrag.
     assert!(
@@ -69,4 +66,36 @@ fn every_kind_of_file_is_checked() {
         "Grundliste der Workspace-Lints fehlt: {problems:?}"
     );
     assert!(!sites.iter().any(|(p, _)| p == "README.md"));
+}
+
+#[test]
+fn cargo_settings_and_macro_attributes_stop_the_check() {
+    let (paths, map) = files(&[
+        (".cargo/config.toml", "[alias]\nxtask = \"run --quiet --package xtask --\"\n[target.x86_64-pc-windows-msvc]\nrunner = \"ok.cmd\"\n"),
+        ("crates/a/.cargo/config.toml", "[alias]\nxtask = \"run --quiet --package xtask --\"\n"),
+        ("rust-toolchain.toml", "[toolchain]\nchannel = \"1.99.1\"\n"),
+        ("src/m.rs", "macro_rules! w { ($m:meta) => { #[$m] fn f() {} }; }"),
+        ("deny.toml", "a = \"\"\"\nx\"\"\"\n"),
+        (".github/workflows/ci.yml", "env:\n  RUSTC_WRAPPER: w.cmd\n"),
+    ]);
+    let (sites, problems) = collect(&paths, |p| map.get(p).cloned().unwrap_or_default());
+    for p in [
+        ".cargo/config.toml",
+        "crates/a/.cargo/config.toml",
+        "rust-toolchain.toml",
+        "src/m.rs",
+        "deny.toml",
+    ] {
+        assert!(
+            problems.iter().any(|m| m.starts_with(p)),
+            "{p}: {problems:?}"
+        );
+    }
+    assert!(
+        sites.contains(&(
+            ".github/workflows/ci.yml".to_string(),
+            "workflow:rustc_wrapper".to_string()
+        )),
+        "{sites:?}"
+    );
 }

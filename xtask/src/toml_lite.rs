@@ -71,6 +71,7 @@ pub fn items(text: &str) -> Vec<Item> {
     let mut out = Vec::new();
     let mut section = String::new();
     let mut pending: Option<(String, String, i64)> = None;
+    let mut tables: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
     for raw in text.lines() {
         let line = strip_comment(raw).trim();
         if let Some((key, mut value, d)) = pending.take() {
@@ -86,6 +87,13 @@ pub fn items(text: &str) -> Vec<Item> {
         }
         if line.starts_with('[') {
             section = clean_key(line.trim_start_matches('[').trim_end_matches(']'));
+            if line.starts_with("[[") {
+                // Liste von Tabellen (`[[bin]]`): jeder Eintrag bekommt eine eigene Nummer, damit gleiche Schlüssel
+                // in verschiedenen Einträgen nicht als doppelt gelten.
+                let n = tables.entry(section.clone()).or_insert(0usize);
+                *n = n.saturating_add(1);
+                section = format!("{section}#{n}");
+            }
             continue;
         }
         let Some((k, v)) = line.split_once('=') else {
@@ -191,6 +199,47 @@ pub fn unquote(value: &str) -> String {
 /// Rohwert ohne Leerraum, für Vergleiche und Meldungen.
 pub fn compact(value: &str) -> String {
     value.chars().filter(|c| !c.is_whitespace()).collect()
+}
+
+/// Kommt außerhalb einer Zeichenkette `"""` oder `'''` vor? Mehrzeilige Texte kennt dieser Leser nicht; in ihnen
+/// ließe sich eine falsche Einstellung vor der echten verstecken (Review Prüflücken M-1).
+fn has_multi_line_string(text: &str) -> bool {
+    text.lines().any(|line| {
+        let chars: Vec<char> = strip_comment(line).chars().collect();
+        let mut q = Quotes::default();
+        chars.iter().enumerate().any(|(i, c)| {
+            let outside_before = q.open.is_none();
+            q.outside(*c);
+            let triple = chars
+                .get(i..i.saturating_add(3))
+                .is_some_and(|t| t.iter().all(|x| x == c));
+            outside_before && (*c == '"' || *c == '\'') && triple
+        })
+    })
+}
+
+/// Harte Verstöße: mehrzeilige Texte und doppelte Schlüssel oder Abschnitte. Beides liest ein echter TOML-Leser anders
+/// (oder gar nicht) als dieser, also wird es nie geprüft, sondern abgelehnt.
+pub fn problems(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if has_multi_line_string(text) {
+        out.push(
+            "mehrzeiliger Text (\"\"\" oder ''') ist in Prüf-Dateien nicht erlaubt".to_string(),
+        );
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    for i in items(text) {
+        if !seen.insert(i.key.clone()) {
+            out.push(format!("Schlüssel `{}` steht doppelt", i.key));
+        }
+    }
+    let mut headers = std::collections::BTreeSet::new();
+    for line in text.lines().map(|l| strip_comment(l).trim()) {
+        if line.starts_with('[') && !line.starts_with("[[") && !headers.insert(compact(line)) {
+            out.push(format!("Abschnitt `{line}` steht doppelt"));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

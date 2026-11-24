@@ -1,6 +1,7 @@
 //! Eigene Prüfwerkzeuge des Repos (SICHERHEIT Anhang D), nur Standardbibliothek, kein Netz:
 //! - `cargo xtask scan` prüft alle versionierten Dateien, `--staged` nur die vorgemerkten (Pre-Commit-Haken).
 //! - `cargo xtask exceptions` vergleicht Ausnahmen im Code mit `docs/SICHERHEIT-AUSNAHMEN.md`.
+mod cargo_config;
 mod date;
 mod deny_policy;
 mod exceptions;

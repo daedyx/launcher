@@ -45,7 +45,7 @@ fn forbidden_files_are_found_except_invented_fixtures() {
 fn large_and_binary_files() {
     let big = vec![b'a'; MAX_FILE_BYTES + 1];
     assert_eq!(scan_file("gross.txt", &big, &[]).len(), 1);
-    let binary = [0u8, 1, 2, b'@', b'x'];
+    let binary = [0x89, b'P', b'N', b'G', 0, 1, 2, b'@', b'x'];
     assert!(scan_file("bild.png", &binary, &[]).is_empty());
 }
 
@@ -149,16 +149,50 @@ fn unknown_binary_files_are_reported_not_skipped() {
 }
 
 #[test]
-fn only_known_image_and_font_endings_count_as_binary() {
-    let binary = [0u8, 1, 2, 0xFF, 0xD8];
+fn image_and_font_endings_without_their_file_signature_are_reported() {
+    let binary = [0u8, 2, 2, 0xFF, 0xD8];
     for name in [
         "a.png", "b.JPG", "c.jpeg", "d.gif", "e.ico", "f.icns", "g.webp", "h.bmp", "i.ttf",
         "j.otf", "k.woff", "l.woff2",
     ] {
-        assert!(scan_file(name, &binary, &[]).is_empty(), "{name}");
+        let got: Vec<_> = scan_file(name, &binary, &[])
+            .into_iter()
+            .map(|f| f.rule)
+            .collect();
+        assert_eq!(got, vec!["unbekannte-binaerdatei"], "{name}");
     }
     assert_eq!(
         rules("bild.png.txt", "\u{0}x"),
         vec![(0, "unbekannte-binaerdatei")]
     );
+}
+
+#[test]
+fn text_disguised_as_image_or_font_is_read_and_reported() {
+    let text = format!("{MAIL_LINE}\n");
+    let got: Vec<_> = scan_file("docs/probe/notiz.png", text.as_bytes(), &[])
+        .into_iter()
+        .map(|f| f.rule)
+        .collect();
+    assert!(
+        got.contains(&"unbekannte-binaerdatei") && got.contains(&"mailadresse"),
+        "{got:?}"
+    );
+    let real: [(&str, &[u8]); 12] = [
+        ("a.png", b"\x89PNG\r\n\x1a\n\0"),
+        ("a.jpg", b"\xFF\xD8\xFF\xE0\0"),
+        ("a.jpeg", b"\xFF\xD8\xFF\xDB\0"),
+        ("a.gif", b"GIF89a\0"),
+        ("a.bmp", b"BM\0\0"),
+        ("a.webp", b"RIFF\0\0\0\0WEBP"),
+        ("a.ico", b"\0\0\x01\0\x01\0"),
+        ("a.icns", b"icns\0\0"),
+        ("a.ttf", b"\0\x01\0\0\0"),
+        ("a.otf", b"OTTO\0"),
+        ("a.woff", b"wOFF\0"),
+        ("a.woff2", b"wOF2\0"),
+    ];
+    for (name, bytes) in real {
+        assert!(scan_file(name, bytes, &[]).is_empty(), "{name}");
+    }
 }

@@ -8,9 +8,50 @@ const FORBIDDEN_EXT: [&str; 13] = [
 ];
 /// Nur diese Endungen gelten als Binärdatei ohne Textzeilen (Bilder, Symbole, Schriften). Jede andere Datei wird
 /// als Text gelesen; enthält sie trotzdem NUL-Bytes, wird sie gemeldet statt still übersprungen.
-const BINARY_EXT: [&str; 12] = [
-    "png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "icns", "ttf", "otf", "woff", "woff2",
+/// Je Endung die Dateikennung am Anfang (`None` = Byte beliebig). Passt sie nicht, ist es kein Bild und keine Schrift,
+/// und die Datei wird als Text gelesen (Review Prüflücken N-1).
+const BINARY_EXT: [(&str, &[Option<u8>]); 12] = [
+    ("png", &[Some(0x89), Some(b'P'), Some(b'N'), Some(b'G')]),
+    ("jpg", &[Some(0xFF), Some(0xD8), Some(0xFF)]),
+    ("jpeg", &[Some(0xFF), Some(0xD8), Some(0xFF)]),
+    ("gif", &[Some(b'G'), Some(b'I'), Some(b'F'), Some(b'8')]),
+    ("bmp", &[Some(b'B'), Some(b'M')]),
+    (
+        "webp",
+        &[
+            Some(b'R'),
+            Some(b'I'),
+            Some(b'F'),
+            Some(b'F'),
+            None,
+            None,
+            None,
+            None,
+            Some(b'W'),
+            Some(b'E'),
+            Some(b'B'),
+            Some(b'P'),
+        ],
+    ),
+    ("ico", &[Some(0), Some(0), Some(1), Some(0)]),
+    ("icns", &[Some(b'i'), Some(b'c'), Some(b'n'), Some(b's')]),
+    ("ttf", &[Some(0), Some(1), Some(0), Some(0)]),
+    ("otf", &[Some(b'O'), Some(b'T'), Some(b'T'), Some(b'O')]),
+    ("woff", &[Some(b'w'), Some(b'O'), Some(b'F'), Some(b'F')]),
+    ("woff2", &[Some(b'w'), Some(b'O'), Some(b'F'), Some(b'2')]),
 ];
+
+/// Bild oder Schrift mit passender Dateikennung?
+fn is_known_binary(ext: Option<&str>, content: &[u8]) -> bool {
+    BINARY_EXT.iter().any(|(e, magic)| {
+        ext == Some(*e)
+            && magic.len() <= content.len()
+            && magic
+                .iter()
+                .zip(content)
+                .all(|(m, c)| m.is_none_or(|m| m == *c))
+    })
+}
 /// Erfundene Beispieldateien dürfen diese Endungen haben.
 const FIXTURE_DIR: &str = "testdata/erfunden/";
 
@@ -104,11 +145,14 @@ pub fn scan_file(path: &str, content: &[u8], words: &[String]) -> Vec<Finding> {
         rules.push((0, "datei-ueber-1-mb"));
     }
     // Bekannte Binärdateien (Bilder, Symbole, Schriften) haben keine Textzeilen; alles andere wird gelesen.
-    if ext.as_deref().is_some_and(|e| BINARY_EXT.contains(&e)) {
+    if is_known_binary(ext.as_deref(), content) {
         return to_findings(path, rules);
     }
     let utf16 = content.starts_with(&[0xFF, 0xFE]) || content.starts_with(&[0xFE, 0xFF]);
-    if !utf16 && content.contains(&0) {
+    let disguised = ext
+        .as_deref()
+        .is_some_and(|e| BINARY_EXT.iter().any(|(b, _)| *b == e));
+    if disguised || (!utf16 && content.contains(&0)) {
         rules.push((0, "unbekannte-binaerdatei"));
     }
     let text = decode_text(content);

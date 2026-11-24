@@ -114,27 +114,3 @@ fn clippy_toml_loosening_counts() {
         "fehlende clippy.toml = alle Sperren fehlen"
     );
 }
-
-#[test]
-fn cargo_config_may_not_change_flags_or_hijack_commands() {
-    let base = "[alias]\nxtask = \"run --quiet --package xtask --\"\n";
-    assert!(config_sites(base).is_empty());
-    assert_eq!(
-        config_sites(&format!(
-            "{base}[build]\nrustflags = [\"-A\", \"warnings\"]\n"
-        )),
-        vec!["build.rustflags"]
-    );
-    assert_eq!(
-        config_sites("[env]\nRUSTFLAGS = \"--cap-lints allow\"\n"),
-        vec!["env.rustflags"]
-    );
-    assert_eq!(
-        config_sites(&format!("{base}clippy = \"check\"\n")),
-        vec!["alias.clippy"]
-    );
-    assert_eq!(
-        config_sites("[alias]\nxtask = \"version\"\n"),
-        vec!["alias.xtask"]
-    );
-}

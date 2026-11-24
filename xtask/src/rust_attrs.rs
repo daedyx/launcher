@@ -63,6 +63,47 @@ fn path(t: &[Tok]) -> (String, usize) {
     (text, len)
 }
 
+/// Wert einer `cfg`-Bedingung, soweit er ohne Wissen über die Umgebung feststeht: `any()` ist falsch, `all()` wahr,
+/// `not`, `any`, `all` verknüpfen; jeder Name (`test`, `windows`, …) ist unbekannt (`None`).
+fn eval_cfg(t: &[Tok]) -> Option<bool> {
+    let (name, len) = path(t);
+    let inner = if t.get(len) == Some(&Tok::Punct('(')) {
+        group(t, len)
+    } else {
+        None
+    };
+    let parts = || {
+        split_commas(inner.unwrap_or_default())
+            .into_iter()
+            .map(eval_cfg)
+            .collect::<Vec<_>>()
+    };
+    match (name.as_str(), inner) {
+        ("not", Some(x)) => eval_cfg(x).map(|v| !v),
+        ("any", Some(_)) => {
+            let p = parts();
+            if p.contains(&Some(true)) {
+                Some(true)
+            } else if p.iter().all(|v| *v == Some(false)) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        ("all", Some(_)) => {
+            let p = parts();
+            if p.contains(&Some(false)) {
+                Some(false)
+            } else if p.iter().all(|v| *v == Some(true)) {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Ein Attribut-Inhalt (`allow(…)`, `cfg_attr(…, …)`, `ignore`, …) → Stellen.
 fn meta(t: &[Tok], out: &mut Vec<String>) {
     let (name, len) = path(t);
@@ -85,34 +126,51 @@ fn meta(t: &[Tok], out: &mut Vec<String>) {
             .into_iter()
             .skip(1)
             .for_each(|p| meta(p, out)),
+        // Nie wahre Bedingung: der Code wird nie gebaut, wie ein `ignore` (Review Prüflücken N-3).
+        ("cfg", Some(inner)) if eval_cfg(inner) == Some(false) => out.push("ignore".to_string()),
         ("ignore", _) => out.push("ignore".to_string()),
         _ => {}
     }
 }
 
+/// Inhalte aller Attribute `#[…]` und `#![…]`.
+fn attributes(t: &[Tok]) -> Vec<&[Tok]> {
+    t.iter()
+        .enumerate()
+        .filter(|(_, tok)| **tok == Tok::Punct('#'))
+        .filter_map(|(i, _)| {
+            let bang = usize::from(t.get(i.saturating_add(1)) == Some(&Tok::Punct('!')));
+            let open = i.saturating_add(1).saturating_add(bang);
+            if t.get(open) == Some(&Tok::Punct('[')) {
+                group(t, open)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 /// Alle Ausnahme-Stellen einer Rust-Datei.
 pub fn sites(src: &str) -> Vec<String> {
     let t = tokens(src);
-    let mut out = Vec::new();
-    for (i, tok) in t.iter().enumerate() {
-        match tok {
-            Tok::Ident(w) if w == "unsafe" => out.push("unsafe".to_string()),
-            Tok::Punct('#') => {
-                let bang = usize::from(t.get(i.saturating_add(1)) == Some(&Tok::Punct('!')));
-                let open = i.saturating_add(1).saturating_add(bang);
-                let inner = if t.get(open) == Some(&Tok::Punct('[')) {
-                    group(&t, open)
-                } else {
-                    None
-                };
-                if let Some(inner) = inner {
-                    meta(inner, &mut out);
-                }
-            }
-            _ => {}
-        }
+    let mut out: Vec<String> = t
+        .iter()
+        .filter(|tok| matches!(tok, Tok::Ident(w) if w == "unsafe"))
+        .map(|_| "unsafe".to_string())
+        .collect();
+    for inner in attributes(&t) {
+        meta(inner, &mut out);
     }
     out
+}
+
+/// Attribute, deren Inhalt aus einem Makro-Platzhalter kommt (`#[$m]`, `#[cfg_attr(x, $m)]`). Darin kann ein `allow`
+/// stehen, das hier niemand sieht (Review Prüflücken M-2); deshalb ist jedes davon hart rot.
+pub fn macro_attributes(src: &str) -> usize {
+    attributes(&tokens(src))
+        .into_iter()
+        .filter(|inner| inner.contains(&Tok::Punct('$')))
+        .count()
 }
 
 #[cfg(test)]

@@ -77,3 +77,42 @@ fn other_attributes_are_no_exceptions() {
     );
     assert!(s("macro_rules! m { ($(#[$a:meta])*) => {} }").is_empty());
 }
+
+#[test]
+fn attributes_from_macro_placeholders_are_counted_for_a_hard_stop() {
+    let hidden =
+        "macro_rules! with { ($m:meta, $i:item) => { #[$m] $i }; }\nwith!(allow(clippy::panic), pub fn f() {});";
+    assert_eq!(macro_attributes(hidden), 1);
+    assert_eq!(
+        macro_attributes("macro_rules! m { ($($a:tt)*) => { #![$($a)*] }; }"),
+        1
+    );
+    assert_eq!(
+        macro_attributes("macro_rules! m { ($x:meta) => { #[cfg_attr(test, $x)] fn f() {} }; }"),
+        1
+    );
+    assert_eq!(
+        macro_attributes("#[allow(clippy::x)]\n#[doc = \"#[$m]\"]\n// #[$m]\nfn f() {}"),
+        0
+    );
+}
+
+#[test]
+fn never_true_cfg_hides_code_like_ignore() {
+    for src in [
+        "#[cfg(any())]\n#[test]\nfn t() {}",
+        "#[cfg(all(test, any()))]\nfn t() {}",
+        "#[cfg(not(all()))]\nfn t() {}",
+        "#![cfg(any())]",
+    ] {
+        assert_eq!(s(src), vec!["ignore"], "{src}");
+    }
+    for src in [
+        "#[cfg(test)]\nfn t() {}",
+        "#[cfg(any(test, windows))]\nfn t() {}",
+        "#[cfg(not(any()))]\nfn t() {}",
+        "#[cfg(all())]\nfn t() {}",
+    ] {
+        assert!(s(src).is_empty(), "{src}");
+    }
+}

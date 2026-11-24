@@ -34,3 +34,24 @@ fn values_are_split_into_strings_elements_and_fields() {
     assert_eq!(unquote(" \"deny\" "), "deny");
     assert_eq!(unquote(" true "), "true");
 }
+
+#[test]
+fn multi_line_strings_and_duplicate_keys_are_refused() {
+    let hidden = "[workspace.package]\ndescription = \"\"\"x\n[workspace.lints.clippy]\nunwrap_used = \"deny\"\n[workspace.package]\ny\"\"\"\n[workspace.lints.clippy]\nunwrap_used = \"allow\"\n";
+    assert!(!problems(hidden).is_empty());
+    assert!(!problems("a = '''\nx\n'''\n").is_empty());
+    assert!(
+        !problems("[s]\nk = 1\n[s]\nk = 2\n").is_empty(),
+        "doppelter Schlüssel"
+    );
+    assert!(
+        !problems("[s]\nk = 1\nk = 2\n").is_empty(),
+        "doppelter Schlüssel im selben Abschnitt"
+    );
+    // Listen von Tabellen ([[bin]]) dürfen dieselben Schlüssel je Eintrag haben.
+    assert!(problems("[[bin]]\nname = \"a\"\n[[bin]]\nname = \"b\"\n").is_empty());
+    assert!(
+        problems("a = \"x \\\"\\\"\\\" y\"\nb = 'z'\n").is_empty(),
+        "drei Anführungszeichen in einem normalen Text"
+    );
+}

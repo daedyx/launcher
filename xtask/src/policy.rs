@@ -1,7 +1,7 @@
 //! Sammelt alle Ausnahme-Stellen und harten Verstöße eines Repos (SICHERHEIT B.4, Review M-2), Datei für Datei:
 //! Rust-Quelltext, `deny.toml`, `clippy.toml`, Manifeste und `.cargo/config.toml`. Fehlen `deny.toml` oder
 //! `clippy.toml`, werden sie wie leere Dateien geprüft: Dann fehlen alle Sperren, und das ist rot.
-use crate::{deny_policy, manifest, rust_attrs};
+use crate::{cargo_config, deny_policy, manifest, rust_attrs, toml_lite};
 
 /// (Datei, Regel) je Ausnahme-Stelle.
 pub type Sites = Vec<(String, String)>;
@@ -22,15 +22,36 @@ pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<S
         let p = path.as_str();
         let name = file_name(p);
         if p.ends_with(".rs") {
-            add(&mut sites, p, rust_attrs::sites(&read(p)));
-        } else if name == "Cargo.toml" {
+            let text = read(p);
+            add(&mut sites, p, rust_attrs::sites(&text));
+            if rust_attrs::macro_attributes(&text) > 0 {
+                problems.push(format!(
+                    "{p}: Attribut aus einem Makro-Platzhalter (`#[$…]`) ist nicht erlaubt"
+                ));
+            }
+            continue;
+        }
+        if name.ends_with(".toml") {
+            problems.extend(
+                toml_lite::problems(&read(p))
+                    .into_iter()
+                    .map(|m| format!("{p}: {m}")),
+            );
+        }
+        if name == "Cargo.toml" {
             problems.extend(manifest::crate_problems(p, &read(p)));
         } else if (name == "clippy.toml" || name == ".clippy.toml") && p != "clippy.toml" {
             problems.push(format!(
                 "{p}: nur eine clippy.toml im Wurzelordner ist erlaubt (Clippy liest auch diese)"
             ));
-        } else if p.ends_with(".cargo/config.toml") || p.ends_with(".cargo/config") {
-            add(&mut sites, p, manifest::config_sites(&read(p)));
+        } else if cargo_config::is_config_file(p) {
+            problems.extend(cargo_config::config_problems(p, &read(p)));
+        } else if cargo_config::is_toolchain_file(p) {
+            problems.push(format!(
+                "{p}: eigene Toolchain-Datei ist nicht erlaubt (die CI nagelt die Version fest)"
+            ));
+        } else if p.starts_with(".github/workflows/") {
+            add(&mut sites, p, cargo_config::workflow_sites(&read(p)));
         }
     }
     // Nur versionierte Dateien zählen; eine nicht eingecheckte Datei gilt als fehlend.
