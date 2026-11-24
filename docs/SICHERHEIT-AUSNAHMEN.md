@@ -38,6 +38,12 @@ keine Fremdtexte in der Befehlszeile.
 | A-022 | deny.toml | RUSTSEC-2026-0372 (zvariant_derive nicht gepflegt) | wie A-020 | wie A-019 | 2026-11-23 | 2027-02-28 |
 | A-023 | deny.toml | licenses.exceptions=epaint_default_fonts:OFL-1.1+Ubuntu-font-1.0 (Schrift-Lizenzen) | Die eingebauten egui-Schriften stehen unter Schrift-Lizenzen; sie erlauben Weitergabe mit dem Programm und sind mit MIT verträglich. Gilt nur für dieses eine Crate. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-11-23 |
 | A-024 | deny.toml | bans.allow-wildcard-paths=true | Eigene Crates im Workspace hängen nur per Pfad voneinander ab (`publish = false`); cargo-deny würde diese Pfad-Abhängigkeiten sonst als Platzhalter-Version melden. Fremde Crates bleiben von `wildcards = "deny"` erfasst. Bisher nicht gezählt, erst der neue Zähler (Review M-2) macht die Lockerung sichtbar. | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-06-30 |
+| A-025 | crates/launcher-core/src/installer.rs | cfg:not(windows) (`run_nsis_install`) | Platzhalter für Nicht-Windows: gibt nur einen Fehler bzw. `false`/`None` zurück, ohne Fremddaten. Clippy prüft in der CI nur unter Windows und sieht den Code nie (Nachprüfung M-4). Neu prüfen, sobald die CI auch für macOS prüft (L5). | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
+| A-026 | crates/launcher-core/src/installer.rs | cfg:not(windows) (`run_nsis_uninstall`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
+| A-027 | crates/launcher-core/src/launch.rs | cfg:not(windows) (`spawn_detached`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
+| A-028 | crates/launcher-core/src/system.rs | cfg:not(windows) (`uninstall_entry`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
+| A-029 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`is_enabled`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
+| A-030 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`set`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers ausstehend | 2026-11-24 | 2027-05-31 |
 
 Eine Zeile mit Regel `scan:<regel>` erlaubt genau diesen Fund des Scans in genau dieser Datei bis zum
 Ablaufdatum; sie zählt nicht als Code-Stelle. Gedacht nur für Altlasten, deren Ablösung beschlossen ist.
@@ -49,14 +55,21 @@ Verglichen werden **Datei und Regel**, nicht nur die Anzahl. Die Regel ist der T
 ` (…)`; Groß-/Kleinschreibung, Leerzeichen und Backticks zählen nicht, mehrere Regeln eines Attributs stehen mit Komma
 in einer Zeile (Reihenfolge egal). Mögliche Regeln:
 - Rust: die Lints eines `allow`/`expect` (auch in `cfg_attr`, über mehrere Zeilen), z. B. `clippy::print_stdout,
-  clippy::print_stderr`; `ignore` (auch `cfg` mit nie wahrer Bedingung wie `any()`); `unsafe`.
+  clippy::print_stderr`; `ignore`; `unsafe`; `cfg:<bedingung>` für Code, den Clippy in der CI nie sieht (Erlaubnisliste:
+  `test`, `windows`, `clippy`, `debug_assertions`, `target_os`/`target_family = "windows"`, `feature`; alles andere,
+  z. B. `cfg:not(windows)`, `cfg:not(clippy)`, `cfg:not(debug_assertions)`, `cfg:any()`, braucht eine Zeile); `build.rs`
+  für jedes Build-Skript.
 - `deny.toml`: die Kennung `RUSTSEC-…` einer Meldung; `advisories.ignore=<crate>`;
   `licenses.exceptions=<crate>:<Lizenz>+<Lizenz>`; jede Abweichung von der Grundliste im Werkzeug als
   `<abschnitt>.<schlüssel>=<wert>`, z. B. `advisories.yanked=warn`, `sources.allow-git=<adresse>`,
   `licenses.allow=<lizenz>`, `bans.skip=<crate>`, `bans.skip-tree=<crate>`, `bans.deny-fehlt=<crate>`,
   `bans.deny-feld=<crate>:<feld>`, `bans.deny-version=<crate>@<version>`.
 - `clippy.toml`: `<schlüssel>=<wert>` außerhalb der Grundliste, `disallowed-methods-fehlt=<pfad>`.
-- `.cargo/audit.toml`: alles außer `ignore`; `Cargo.toml`: zusätzliche `workspace.lints.<werkzeug>.<lint>=allow`.
+- `.cargo/audit.toml`: alles außer `ignore`; `Cargo.toml`: zusätzliche `workspace.lints.<werkzeug>.<lint>=allow` und
+  `manifest:<schlüssel>` für jeden Schlüssel außerhalb der Erlaubnisliste, z. B. `manifest:lib.test`,
+  `manifest:lib.harness`, `manifest:test#1.harness`, `manifest:package.autotests`, `manifest:package.build`,
+  `manifest:patch.crates-io.<crate>`, `manifest:replace.<crate>`, `manifest:workspace.exclude`,
+  `manifest:profile.release.<schlüssel>[=<wert>]`.
 - Workflows (`.github/workflows/*`): `workflow:<name>` für das Setzen von `RUSTFLAGS`, `RUSTC_WRAPPER`, `RUSTC`,
   `RUSTC_BOOTSTRAP`, `RUSTUP_TOOLCHAIN`, `CLIPPY_CONF_DIR`, `CARGO_HOME`, `CARGO_BUILD_*`, `CARGO_TARGET_*`,
   `CARGO_PROFILE_*`, `CARGO_ALIAS_*` u. ä.; `workflow:--config`, `workflow:--cap-lints`, `workflow:cargo +`.

@@ -60,6 +60,13 @@ Ausnahme läuft höchstens 12 Monate. Hart rot sind außerdem: in `.cargo/config
 Makro-Platzhaltern (`#[$m]`). Die CI prüft die Cargo-Konfiguration zuerst ohne Cargo und startet `scan` und
 `exceptions` als gebautes Programm, nicht über `cargo run`.
 
+Erlaubnislisten statt Verbotslisten: Manifeste dürfen nur bekannte Schlüssel enthalten, Build-Skripte und `cfg`-
+Bedingungen, die Code vor dem Clippy der CI verstecken, brauchen einen Eintrag; Unbekanntes ist immer ein Fund.
+In der CI laufen `scan --head` und `exceptions --head` in einem eigenen Job **vor** jedem Build oder Test und lesen
+den Commit, nicht den Arbeitsordner; alle anderen Jobs warten darauf. Nach den Tests prüft `xtask testzahl` die
+Mindestzahl bestandener Tests je Testprogramm (`xtask/testzahlen.txt`), und der Arbeitsordner muss unverändert
+sein. Die Mindestzahl zu senken ist eine Lockerung und braucht das Ja des Betreuers.
+
 ## Einmal je Klon
 ```
 git config core.hooksPath .githooks
