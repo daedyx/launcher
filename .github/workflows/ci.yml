@@ -13,8 +13,11 @@ env:
   CARGO_TERM_COLOR: never
 
 jobs:
-  pruefen:
-    name: fmt, clippy, test, scan
+  # Zuerst und allein: Scan und Ausnahmenzähler auf einem frischen Checkout, bevor irgendein Code aus dem Repo läuft
+  # (Tests, Build-Skripte, Proc-Makros). Sie lesen den Commit (`--head`), nicht den Arbeitsordner
+  # (Review Prüflücken H-2). Alle anderen Jobs warten darauf (`needs`).
+  vorpruefung:
+    name: scan, exceptions (vor jedem Build)
     runs-on: windows-latest
     permissions:
       contents: read
@@ -22,9 +25,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Vor dem ersten Cargo-Aufruf und ohne Cargo: Eine Cargo-Konfiguration mit `runner`, `rustc-wrapper` u. a.
-      # könnte sonst Tests und Prüfprogramme abschalten (Review Prüflücken H-1). Erlaubt ist nur der xtask-Alias.
-      - name: Cargo-Konfiguration prüfen (ohne Cargo)
+      # Ohne Cargo: Eine Cargo-Konfiguration mit `runner`, `rustc-wrapper` u. a. könnte sonst Tests und
+      # Prüfprogramme abschalten (Review Prüflücken H-1). Erlaubt ist nur der xtask-Alias. Das Prüfprogramm selbst
+      # darf beim Bauen keinen fremden Code ausführen: kein Build-Skript, keine Abhängigkeiten.
+      - name: Cargo-Konfiguration und Prüfprogramm prüfen (ohne Cargo)
         shell: pwsh
         run: |
           $muster = '(^|/)(\.cargo/config(\.toml)?|rust-toolchain(\.toml)?)$'
@@ -33,22 +37,61 @@ jobs:
           $erlaubt = @('[alias]', 'xtask = "run --quiet --package xtask --"')
           $zeilen = @(Get-Content .cargo/config.toml | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
           if (($zeilen -join "`n") -ne ($erlaubt -join "`n")) { throw ".cargo/config.toml enthält mehr als den xtask-Alias" }
+          if (git ls-files 'xtask/build.rs') { throw "xtask/build.rs ist nicht erlaubt" }
+          $xtask = @(Get-Content xtask/Cargo.toml | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+          if ($xtask | Where-Object { $_ -match '^\[.*dependencies' -or $_ -match '^build\s*=' -or $_ -match 'proc-macro' }) { throw "xtask/Cargo.toml darf keine Abhängigkeiten und kein Build-Skript haben" }
+      - name: Rust festnageln
+        shell: pwsh
+        run: |
+          rustup toolchain install $env:RUST_VERSION --profile minimal --component clippy,rustfmt
+          rustup default $env:RUST_VERSION
+      # Nur das xtask-Crate bauen (nur Standardbibliothek) und direkt starten, nicht über `cargo run`.
+      - run: cargo build --locked --package xtask
+      - run: .\target\debug\xtask.exe scan --head
+      - run: .\target\debug\xtask.exe exceptions --head
+
+  pruefen:
+    name: fmt, clippy, test, Testzahl
+    needs: vorpruefung
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Rust festnageln
         shell: pwsh
         run: |
           rustup toolchain install $env:RUST_VERSION --profile minimal --component clippy,rustfmt
           rustup default $env:RUST_VERSION
       - run: cargo fetch --locked
+      # Das Prüfprogramm vor jedem anderen Code bauen und beiseitelegen.
+      - name: xtask bauen
+        shell: pwsh
+        run: |
+          cargo build --locked --offline --package xtask
+          Copy-Item .\target\debug\xtask.exe "$env:RUNNER_TEMP\xtask.exe"
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
-      - run: cargo test --workspace --all-features --locked --offline
-      # Die Prüfprogramme direkt starten, nicht über `cargo run` (so kommt kein Runner dazwischen).
-      - run: cargo build --locked --offline --package xtask
-      - run: .\target\debug\xtask.exe scan
-      - run: .\target\debug\xtask.exe exceptions
+      # bash läuft bei GitHub mit `-eo pipefail`: ein Fehler in `cargo test` bleibt trotz `tee` rot.
+      - name: Tests mit Protokoll
+        shell: bash
+        run: cargo test --workspace --all-features --locked --offline 2>&1 | tee "$RUNNER_TEMP/test.log"
+      # Keine Testgruppe darf still wegfallen: Mindestzahl je Testprogramm aus dem Commit (xtask/testzahlen.txt).
+      - name: Testzahl
+        shell: pwsh
+        run: '& "$env:RUNNER_TEMP\xtask.exe" testzahl "$env:RUNNER_TEMP\test.log" --head'
+      # Tests dürfen keine versionierten Dateien ändern.
+      - name: Arbeitsordner unverändert
+        shell: pwsh
+        run: |
+          $aenderungen = git status --porcelain --untracked-files=no
+          if ($aenderungen) { throw "Tests haben versionierte Dateien geändert: $aenderungen" }
 
   lieferkette:
     name: cargo deny, cargo audit
+    needs: vorpruefung
     runs-on: ubuntu-latest
     permissions:
       contents: read
