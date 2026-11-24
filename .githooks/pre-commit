@@ -3,6 +3,15 @@
 # Einschalten je Klon (einmal):  git config core.hooksPath .githooks
 # Nie mit --no-verify umgehen (SICHERHEIT 5.7).
 set -e
+# Zuerst ohne Cargo: Die Cargo-Konfiguration darf nur den xtask-Alias enthalten, sonst könnte ein `runner` oder
+# `rustc-wrapper` die Prüfungen unten abschalten (Review Prüflücken H-1).
+andere=$(git ls-files | grep -E '(^|/)(\.cargo/config(\.toml)?|rust-toolchain(\.toml)?)$' | grep -vx '.cargo/config.toml' || true)
+inhalt=$(grep -v '^[[:space:]]*#' .cargo/config.toml | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr -d '\r' | grep -v '^$')
+erwartet=$(printf '%s\n%s' '[alias]' 'xtask = "run --quiet --package xtask --"')
+if [ -n "$andere" ] || [ "$inhalt" != "$erwartet" ]; then
+  echo "Cargo-Konfiguration: nur .cargo/config.toml mit dem xtask-Alias ist erlaubt." >&2
+  exit 1
+fi
 cargo fmt --all --check
 cargo xtask scan --staged
 cargo xtask exceptions
