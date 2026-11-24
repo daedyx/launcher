@@ -36,12 +36,17 @@ fn file_name(p: &str) -> &str {
 }
 
 /// Eine Cargo-Konfigurationsdatei, egal in welchem Ordner (Cargo liest alle vom Arbeitsordner aufwärts).
+/// Groß- und Kleinschreibung zählt nicht (Windows liest `.CARGO\Config.toml` genauso).
 pub fn is_config_file(p: &str) -> bool {
-    p.ends_with(".cargo/config.toml") || p.ends_with(".cargo/config") || p == ".cargo/config"
+    let p = p.to_ascii_lowercase();
+    p.ends_with(".cargo/config.toml") || p.ends_with(".cargo/config")
 }
 
 pub fn is_toolchain_file(p: &str) -> bool {
-    matches!(file_name(p), "rust-toolchain" | "rust-toolchain.toml")
+    matches!(
+        file_name(&p.to_ascii_lowercase()),
+        "rust-toolchain" | "rust-toolchain.toml"
+    )
 }
 
 /// Harte Verstöße einer Cargo-Konfigurationsdatei.

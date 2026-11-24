@@ -99,3 +99,26 @@ fn cargo_settings_and_macro_attributes_stop_the_check() {
         "{sites:?}"
     );
 }
+
+#[test]
+fn build_scripts_and_crate_settings_are_sites() {
+    let (paths, map) = files(&[
+        ("crates/a/build.rs", "fn main() {}"),
+        (
+            "crates/a/Cargo.toml",
+            "[package]\nname = \"a\"\n[lib]\ntest = false\n[lints]\nworkspace = true\n",
+        ),
+    ]);
+    let (sites, _) = collect(&paths, |p| map.get(p).cloned().unwrap_or_default());
+    assert!(
+        sites.contains(&("crates/a/build.rs".to_string(), "build.rs".to_string())),
+        "{sites:?}"
+    );
+    assert!(
+        sites.contains(&(
+            "crates/a/Cargo.toml".to_string(),
+            "manifest:lib.test".to_string()
+        )),
+        "{sites:?}"
+    );
+}

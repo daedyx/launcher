@@ -11,14 +11,14 @@ pub struct Item {
 
 /// Merkt sich, ob ein Zeichen in einer Zeichenkette steht (`"…"` mit Escapes oder `'…'` ohne).
 #[derive(Default)]
-struct Quotes {
-    open: Option<char>,
+pub(crate) struct Quotes {
+    pub(crate) open: Option<char>,
     escaped: bool,
 }
 
 impl Quotes {
     /// `true`, wenn das Zeichen außerhalb einer Zeichenkette steht (Anführungszeichen selbst zählen als innen).
-    fn outside(&mut self, c: char) -> bool {
+    pub(crate) fn outside(&mut self, c: char) -> bool {
         match self.open {
             Some(q) => {
                 if self.escaped {
@@ -39,7 +39,7 @@ impl Quotes {
     }
 }
 
-fn strip_comment(line: &str) -> &str {
+pub(crate) fn strip_comment(line: &str) -> &str {
     let mut q = Quotes::default();
     line.char_indices()
         .find(|(_, c)| q.outside(*c) && *c == '#')
@@ -199,47 +199,6 @@ pub fn unquote(value: &str) -> String {
 /// Rohwert ohne Leerraum, für Vergleiche und Meldungen.
 pub fn compact(value: &str) -> String {
     value.chars().filter(|c| !c.is_whitespace()).collect()
-}
-
-/// Kommt außerhalb einer Zeichenkette `"""` oder `'''` vor? Mehrzeilige Texte kennt dieser Leser nicht; in ihnen
-/// ließe sich eine falsche Einstellung vor der echten verstecken (Review Prüflücken M-1).
-fn has_multi_line_string(text: &str) -> bool {
-    text.lines().any(|line| {
-        let chars: Vec<char> = strip_comment(line).chars().collect();
-        let mut q = Quotes::default();
-        chars.iter().enumerate().any(|(i, c)| {
-            let outside_before = q.open.is_none();
-            q.outside(*c);
-            let triple = chars
-                .get(i..i.saturating_add(3))
-                .is_some_and(|t| t.iter().all(|x| x == c));
-            outside_before && (*c == '"' || *c == '\'') && triple
-        })
-    })
-}
-
-/// Harte Verstöße: mehrzeilige Texte und doppelte Schlüssel oder Abschnitte. Beides liest ein echter TOML-Leser anders
-/// (oder gar nicht) als dieser, also wird es nie geprüft, sondern abgelehnt.
-pub fn problems(text: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    if has_multi_line_string(text) {
-        out.push(
-            "mehrzeiliger Text (\"\"\" oder ''') ist in Prüf-Dateien nicht erlaubt".to_string(),
-        );
-    }
-    let mut seen = std::collections::BTreeSet::new();
-    for i in items(text) {
-        if !seen.insert(i.key.clone()) {
-            out.push(format!("Schlüssel `{}` steht doppelt", i.key));
-        }
-    }
-    let mut headers = std::collections::BTreeSet::new();
-    for line in text.lines().map(|l| strip_comment(l).trim()) {
-        if line.starts_with('[') && !line.starts_with("[[") && !headers.insert(compact(line)) {
-            out.push(format!("Abschnitt `{line}` steht doppelt"));
-        }
-    }
-    out
 }
 
 #[cfg(test)]

@@ -3,10 +3,11 @@
 //! zählen nicht. Je Stelle ein Text: die Regeln eines Attributs sortiert und mit Komma getrennt
 //! (`clippy::exit,clippy::print_stdout`), oder `ignore` bzw. `unsafe`.
 
+use crate::cfg_eval;
 use crate::rust_tokens::{tokens, Tok};
 
 /// Inhalt der Klammer, die bei `open` beginnt (alle Klammerarten zählen für die Tiefe).
-fn group(t: &[Tok], open: usize) -> Option<&[Tok]> {
+pub(crate) fn group(t: &[Tok], open: usize) -> Option<&[Tok]> {
     let mut depth = 0usize;
     for (k, tok) in t.iter().enumerate().skip(open) {
         match tok {
@@ -24,7 +25,7 @@ fn group(t: &[Tok], open: usize) -> Option<&[Tok]> {
 }
 
 /// Teile auf oberster Ebene, getrennt durch Kommas.
-fn split_commas(t: &[Tok]) -> Vec<&[Tok]> {
+pub(crate) fn split_commas(t: &[Tok]) -> Vec<&[Tok]> {
     let mut parts = Vec::new();
     let (mut depth, mut start) = (0usize, 0usize);
     for (k, tok) in t.iter().enumerate() {
@@ -43,7 +44,7 @@ fn split_commas(t: &[Tok]) -> Vec<&[Tok]> {
 }
 
 /// Pfad am Anfang (`clippy::x`) und die Anzahl der Teile, die er belegt.
-fn path(t: &[Tok]) -> (String, usize) {
+pub(crate) fn path(t: &[Tok]) -> (String, usize) {
     let len = t
         .iter()
         .take_while(|x| matches!(x, Tok::Ident(_) | Tok::Punct(':')))
@@ -56,52 +57,11 @@ fn path(t: &[Tok]) -> (String, usize) {
             match x {
                 Tok::Ident(w) => s.push_str(w),
                 Tok::Punct(p) => s.push(*p),
-                Tok::Lit => {}
+                Tok::Lit(_) => {}
             }
             s
         });
     (text, len)
-}
-
-/// Wert einer `cfg`-Bedingung, soweit er ohne Wissen über die Umgebung feststeht: `any()` ist falsch, `all()` wahr,
-/// `not`, `any`, `all` verknüpfen; jeder Name (`test`, `windows`, …) ist unbekannt (`None`).
-fn eval_cfg(t: &[Tok]) -> Option<bool> {
-    let (name, len) = path(t);
-    let inner = if t.get(len) == Some(&Tok::Punct('(')) {
-        group(t, len)
-    } else {
-        None
-    };
-    let parts = || {
-        split_commas(inner.unwrap_or_default())
-            .into_iter()
-            .map(eval_cfg)
-            .collect::<Vec<_>>()
-    };
-    match (name.as_str(), inner) {
-        ("not", Some(x)) => eval_cfg(x).map(|v| !v),
-        ("any", Some(_)) => {
-            let p = parts();
-            if p.contains(&Some(true)) {
-                Some(true)
-            } else if p.iter().all(|v| *v == Some(false)) {
-                Some(false)
-            } else {
-                None
-            }
-        }
-        ("all", Some(_)) => {
-            let p = parts();
-            if p.contains(&Some(false)) {
-                Some(false)
-            } else if p.iter().all(|v| *v == Some(true)) {
-                Some(true)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
 }
 
 /// Ein Attribut-Inhalt (`allow(…)`, `cfg_attr(…, …)`, `ignore`, …) → Stellen.
@@ -126,8 +86,10 @@ fn meta(t: &[Tok], out: &mut Vec<String>) {
             .into_iter()
             .skip(1)
             .for_each(|p| meta(p, out)),
-        // Nie wahre Bedingung: der Code wird nie gebaut, wie ein `ignore` (Review Prüflücken N-3).
-        ("cfg", Some(inner)) if eval_cfg(inner) == Some(false) => out.push("ignore".to_string()),
+        // Code, den Clippy in der CI nie sieht, braucht einen Eintrag (Review Prüflücken N-3, M-4).
+        ("cfg", Some(inner)) if !cfg_eval::visible_to_clippy(inner) => {
+            out.push(format!("cfg:{}", cfg_eval::render(inner)))
+        }
         ("ignore", _) => out.push("ignore".to_string()),
         _ => {}
     }

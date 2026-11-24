@@ -114,3 +114,105 @@ fn clippy_toml_loosening_counts() {
         "fehlende clippy.toml = alle Sperren fehlen"
     );
 }
+
+const FULL_CRATE: &str = r#"[package]
+name = "a"
+version.workspace = true
+edition.workspace = true
+description = "x"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "a"
+path = "src/main.rs"
+required-features = ["h"]
+
+[features]
+h = []
+
+[dependencies]
+x = "1"
+y = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+z = "1"
+
+[dev-dependencies]
+w = "1"
+
+[lints]
+workspace = true
+"#;
+
+#[test]
+fn crate_settings_outside_the_allowlist_need_an_entry() {
+    assert!(
+        crate_sites(FULL_CRATE).is_empty(),
+        "{:?}",
+        crate_sites(FULL_CRATE)
+    );
+    for (extra, want) in [
+        ("[lib]\ntest = false\n", "manifest:lib.test"),
+        ("[lib]\ndoctest = false\n", "manifest:lib.doctest"),
+        ("[lib]\nharness = false\n", "manifest:lib.harness"),
+        (
+            "[[test]]\nname = \"t\"\nharness = false\n",
+            "manifest:test#1.harness",
+        ),
+        (
+            "[[bin]]\nname = \"b\"\ntest = false\n",
+            "manifest:bin#2.test",
+        ),
+        (
+            "[patch.crates-io]\nserde = { path = \"vendor/serde\" }\n",
+            "manifest:patch.crates-io.serde",
+        ),
+        (
+            "[replace]\n\"serde:1.0.0\" = { path = \"vendor/serde\" }\n",
+            "manifest:replace.serde:1.0.0",
+        ),
+        (
+            "[profile.release]\nopt-level = 0\n",
+            "manifest:profile.release.opt-level",
+        ),
+    ] {
+        assert_eq!(
+            crate_sites(&format!("{FULL_CRATE}{extra}")),
+            vec![want.to_string()],
+            "{extra}"
+        );
+    }
+    for to in [
+        "publish = false\nautotests = false\n",
+        "publish = false\nbuild = \"build.rs\"\n",
+    ] {
+        let got = crate_sites(&FULL_CRATE.replace("publish = false\n", to));
+        assert_eq!(got.len(), 1, "{to} {got:?}");
+        assert!(
+            got.iter()
+                .all(|s| s == "manifest:package.autotests" || s == "manifest:package.build"),
+            "{got:?}"
+        );
+    }
+}
+
+#[test]
+fn workspace_settings_outside_the_allowlist_need_an_entry() {
+    let base = format!(
+        "{WORKSPACE}\n[workspace.package]\nedition = \"2024\"\n\n[workspace.dependencies]\nx = \"1\"\n\n[profile.release]\noverflow-checks = true\ndebug = false\nstrip = \"symbols\"\n"
+    );
+    let (p, s) = workspace(&base);
+    assert!(p.is_empty() && s.is_empty(), "{p:?} {s:?}");
+    let (_, s) = workspace(&format!(
+        "{base}[patch.crates-io]\nx = {{ path = \"v/x\" }}\n"
+    ));
+    assert_eq!(s, vec!["manifest:patch.crates-io.x"]);
+    let (_, s) = workspace(&base.replace(
+        "members = [\"crates/*\"]",
+        "members = [\"crates/*\"]\nexclude = [\"crates/b\"]",
+    ));
+    assert_eq!(s, vec!["manifest:workspace.exclude"]);
+    let (_, s) = workspace(&base.replace("overflow-checks = true", "overflow-checks = false"));
+    assert_eq!(s, vec!["manifest:profile.release.overflow-checks=false"]);
+}

@@ -48,3 +48,42 @@ pub fn staged_content(path: &str) -> Result<Vec<u8>, String> {
 pub fn worktree_content(path: &str) -> Option<Vec<u8>> {
     std::fs::read(path).ok()
 }
+
+/// Woher die Prüfungen lesen: Arbeitsordner (lokal), Index (Pre-Commit-Haken) oder der Commit `HEAD` (CI). In der
+/// CI zählt nur `HEAD`: Was Tests oder Build-Skripte im Arbeitsordner ändern, sieht die Prüfung so nicht
+/// (Review Prüflücken H-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Source {
+    Worktree,
+    Staged,
+    Head,
+}
+
+impl Source {
+    pub fn from_args(args: &[String]) -> Source {
+        if args.iter().any(|a| a == "--head") {
+            Source::Head
+        } else if args.iter().any(|a| a == "--staged") {
+            Source::Staged
+        } else {
+            Source::Worktree
+        }
+    }
+
+    pub fn paths(self) -> Result<Vec<String>, String> {
+        match self {
+            Source::Worktree => tracked(),
+            Source::Staged => staged(),
+            Source::Head => split_names(&git(&["ls-tree", "-r", "-z", "--name-only", "HEAD"])?),
+        }
+    }
+
+    /// Inhalt einer Datei; im Arbeitsordner gelöschte Dateien sind leer.
+    pub fn content(self, path: &str) -> Result<Vec<u8>, String> {
+        match self {
+            Source::Worktree => Ok(worktree_content(path).unwrap_or_default()),
+            Source::Staged => staged_content(path),
+            Source::Head => git(&["show", &format!("HEAD:{path}")]),
+        }
+    }
+}

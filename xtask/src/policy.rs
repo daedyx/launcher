@@ -1,7 +1,7 @@
 //! Sammelt alle Ausnahme-Stellen und harten Verstöße eines Repos (SICHERHEIT B.4, Review M-2), Datei für Datei:
 //! Rust-Quelltext, `deny.toml`, `clippy.toml`, Manifeste und `.cargo/config.toml`. Fehlen `deny.toml` oder
 //! `clippy.toml`, werden sie wie leere Dateien geprüft: Dann fehlen alle Sperren, und das ist rot.
-use crate::{cargo_config, deny_policy, manifest, rust_attrs, toml_lite};
+use crate::{cargo_config, deny_policy, manifest, rust_attrs, toml_check};
 
 /// (Datei, Regel) je Ausnahme-Stelle.
 pub type Sites = Vec<(String, String)>;
@@ -21,6 +21,10 @@ pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<S
     for path in paths {
         let p = path.as_str();
         let name = file_name(p);
+        if name == "build.rs" {
+            // Ein Build-Skript führt beim Bauen eigenen Code aus, auch vor Clippy und Tests: nur mit Eintrag.
+            add(&mut sites, p, vec!["build.rs".to_string()]);
+        }
         if p.ends_with(".rs") {
             let text = read(p);
             add(&mut sites, p, rust_attrs::sites(&text));
@@ -33,13 +37,15 @@ pub fn collect(paths: &[String], read: impl Fn(&str) -> String) -> (Sites, Vec<S
         }
         if name.ends_with(".toml") {
             problems.extend(
-                toml_lite::problems(&read(p))
+                toml_check::problems(&read(p))
                     .into_iter()
                     .map(|m| format!("{p}: {m}")),
             );
         }
         if name == "Cargo.toml" {
-            problems.extend(manifest::crate_problems(p, &read(p)));
+            let text = read(p);
+            problems.extend(manifest::crate_problems(p, &text));
+            add(&mut sites, p, manifest::crate_sites(&text));
         } else if (name == "clippy.toml" || name == ".clippy.toml") && p != "clippy.toml" {
             problems.push(format!(
                 "{p}: nur eine clippy.toml im Wurzelordner ist erlaubt (Clippy liest auch diese)"

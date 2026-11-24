@@ -44,6 +44,10 @@ fn config_files_elsewhere_and_toolchain_files_are_red() {
     }
     assert!(!is_toolchain_file("docs/rust-toolchain.md"));
     assert!(
+        is_config_file(".CARGO/Config.toml") && is_toolchain_file("Rust-Toolchain.TOML"),
+        "Windows: Schreibweise egal"
+    );
+    assert!(
         is_config_file(".cargo/config.toml")
             && is_config_file("a/.cargo/config")
             && !is_config_file(".cargo/audit.toml")

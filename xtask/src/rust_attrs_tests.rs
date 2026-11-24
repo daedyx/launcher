@@ -98,20 +98,40 @@ fn attributes_from_macro_placeholders_are_counted_for_a_hard_stop() {
 }
 
 #[test]
-fn never_true_cfg_hides_code_like_ignore() {
-    for src in [
-        "#[cfg(any())]\n#[test]\nfn t() {}",
-        "#[cfg(all(test, any()))]\nfn t() {}",
-        "#[cfg(not(all()))]\nfn t() {}",
-        "#![cfg(any())]",
+fn cfg_that_hides_code_from_clippy_needs_an_entry() {
+    // Die CI prüft mit Clippy unter Windows, ohne `--release`, mit allen Merkmalen, mit und ohne `test`.
+    for (src, want) in [
+        ("#[cfg(any())]\n#[test]\nfn t() {}", "cfg:any()"),
+        ("#[cfg(all(test, any()))]\nfn t() {}", "cfg:all(test,any())"),
+        ("#![cfg(not(all()))]", "cfg:not(all())"),
+        ("#[cfg(not(clippy))]\nfn f() {}", "cfg:not(clippy)"),
+        (
+            "#[cfg(not(debug_assertions))]\nfn f() {}",
+            "cfg:not(debug_assertions)",
+        ),
+        ("#[cfg(not(windows))]\nfn f() {}", "cfg:not(windows)"),
+        (
+            "#[cfg(target_os = \"macos\")]\nfn f() {}",
+            "cfg:target_os=\"macos\"",
+        ),
+        (
+            "#[cfg(eigener_schalter)]\nfn f() {}",
+            "cfg:eigener_schalter",
+        ),
     ] {
-        assert_eq!(s(src), vec!["ignore"], "{src}");
+        assert_eq!(s(src), vec![want], "{src}");
     }
     for src in [
         "#[cfg(test)]\nfn t() {}",
-        "#[cfg(any(test, windows))]\nfn t() {}",
+        "#[cfg(not(test))]\nfn t() {}",
+        "#[cfg(windows)]\nfn f() {}",
+        "#[cfg(debug_assertions)]\nfn f() {}",
+        "#[cfg(target_os = \"windows\")]\nfn f() {}",
+        "#[cfg(any(test, target_os = \"macos\"))]\nfn f() {}",
+        "#![cfg(all(windows, feature = \"test-helpers\"))]",
         "#[cfg(not(any()))]\nfn t() {}",
         "#[cfg(all())]\nfn t() {}",
+        "#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = \"windows\")]",
     ] {
         assert!(s(src).is_empty(), "{src}");
     }
