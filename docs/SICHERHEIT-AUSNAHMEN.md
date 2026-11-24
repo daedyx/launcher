@@ -2,7 +2,7 @@
 
 Jede Ausnahme von einer Regel aus `docs/SICHERHEIT.md` steht hier: `#[allow(...)]` im Code, `ignore` in
 `deny.toml`, `#[ignore]` an Tests, `unsafe`. Ohne Eintrag ist die Ausnahme nicht erlaubt. Dazu zählen auch
-Lockerungen in `deny.toml`, `clippy.toml`, `.cargo/config.toml` und `.cargo/audit.toml`. Die CI sucht die Stellen
+Lockerungen in `deny.toml`, `clippy.toml`, `.cargo/audit.toml` und Workflows. Die CI sucht die Stellen
 (`cargo xtask exceptions`) und vergleicht sie mit dieser Tabelle; eine Stelle ohne passende Zeile, eine Zeile ohne
 Stelle oder ein abgelaufener Eintrag sind rot. Eine Datei mit zwei Stellen bekommt zwei Zeilen.
 
@@ -49,15 +49,21 @@ Verglichen werden **Datei und Regel**, nicht nur die Anzahl. Die Regel ist der T
 ` (…)`; Groß-/Kleinschreibung, Leerzeichen und Backticks zählen nicht, mehrere Regeln eines Attributs stehen mit Komma
 in einer Zeile (Reihenfolge egal). Mögliche Regeln:
 - Rust: die Lints eines `allow`/`expect` (auch in `cfg_attr`, über mehrere Zeilen), z. B. `clippy::print_stdout,
-  clippy::print_stderr`; `ignore`; `unsafe`.
+  clippy::print_stderr`; `ignore` (auch `cfg` mit nie wahrer Bedingung wie `any()`); `unsafe`.
 - `deny.toml`: die Kennung `RUSTSEC-…` einer Meldung; `advisories.ignore=<crate>`;
   `licenses.exceptions=<crate>:<Lizenz>+<Lizenz>`; jede Abweichung von der Grundliste im Werkzeug als
   `<abschnitt>.<schlüssel>=<wert>`, z. B. `advisories.yanked=warn`, `sources.allow-git=<adresse>`,
-  `licenses.allow=<lizenz>`, `bans.skip=<crate>`, `bans.skip-tree=<crate>`, `bans.deny-fehlt=<crate>`.
+  `licenses.allow=<lizenz>`, `bans.skip=<crate>`, `bans.skip-tree=<crate>`, `bans.deny-fehlt=<crate>`,
+  `bans.deny-feld=<crate>:<feld>`, `bans.deny-version=<crate>@<version>`.
 - `clippy.toml`: `<schlüssel>=<wert>` außerhalb der Grundliste, `disallowed-methods-fehlt=<pfad>`.
-- `.cargo/config.toml`: `build.rustflags` u. ä., `alias.<name>`; `.cargo/audit.toml`: alles außer `ignore`;
-  `Cargo.toml`: zusätzliche `workspace.lints.<werkzeug>.<lint>=allow`.
+- `.cargo/audit.toml`: alles außer `ignore`; `Cargo.toml`: zusätzliche `workspace.lints.<werkzeug>.<lint>=allow`.
+- Workflows (`.github/workflows/*`): `workflow:<name>` für das Setzen von `RUSTFLAGS`, `RUSTC_WRAPPER`, `RUSTC`,
+  `RUSTC_BOOTSTRAP`, `RUSTUP_TOOLCHAIN`, `CLIPPY_CONF_DIR`, `CARGO_HOME`, `CARGO_BUILD_*`, `CARGO_TARGET_*`,
+  `CARGO_PROFILE_*`, `CARGO_ALIAS_*` u. ä.; `workflow:--config`, `workflow:--cap-lints`, `workflow:cargo +`.
 
 Ohne Ausnahme-Weg rot: ein Crate-Manifest ohne `[lints] workspace = true` oder mit eigenen Lint-Stufen, Workspace-Lints
-schwächer als die Grundliste, eine zweite `clippy.toml`. Der Ablauf liegt höchstens 12 Monate nach dem Eintragsdatum,
+schwächer als die Grundliste, eine zweite `clippy.toml`; in `.cargo/config.toml` jeder Schlüssel außer dem
+`xtask`-Alias (z. B. `runner`, `rustc-wrapper`, `rustflags`, `linker`, `[env]`), jede weitere Cargo-Konfigurationsdatei
+und jede `rust-toolchain`-Datei; mehrzeilige Texte (`"""`, `'''`) und doppelte Schlüssel in Prüf-TOML; Attribute aus
+Makro-Platzhaltern (`#[$m]`). Der Ablauf liegt höchstens 12 Monate nach dem Eintragsdatum,
 das Eintragsdatum nicht in der Zukunft.

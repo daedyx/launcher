@@ -45,15 +45,20 @@ Was der Scan meldet und wie die lokale Wortliste funktioniert, steht in `xtask/s
 `xtask/src/wordlist.rs` (gleiches Werkzeug wie in `daedyx/core`).
 Gelesen wird jede Datei als Text: UTF-16 mit BOM (LE und BE) als UTF-16, sonst UTF-8 mit Ersatzzeichen für
 ungültige Bytes (z. B. Windows-1252). Als binär gelten nur Bild- und Schrift-Endungen (`png`, `jpg`, `jpeg`, `gif`,
-`bmp`, `webp`, `ico`, `icns`, `ttf`, `otf`, `woff`, `woff2`); jede andere Datei mit NUL-Byte meldet
-`unbekannte-binaerdatei` und wird trotzdem zeilenweise geprüft.
+`bmp`, `webp`, `ico`, `icns`, `ttf`, `otf`, `woff`, `woff2`), und nur mit passender Dateikennung am Anfang; jede
+andere Datei mit NUL-Byte und jede Datei mit falscher Kennung meldet `unbekannte-binaerdatei` und wird trotzdem
+zeilenweise geprüft.
 
 `cargo xtask exceptions` sucht Ausnahmen und Lockerungen und vergleicht Datei **und Regel** mit
 `docs/SICHERHEIT-AUSNAHMEN.md` (Einzelheiten dort): `allow`/`expect` auch in `cfg_attr`, mit Leerzeichen und über
 mehrere Zeilen, `#[ignore]`, `unsafe`; in `deny.toml` jede Abweichung von der festgehaltenen Grundliste (u. a.
 `yanked`, `unmaintained`, `unknown-git`, `allow-git`, neue Lizenzen, `skip`/`skip-tree`); Lockerungen in
-`clippy.toml`, `.cargo/config.toml` und `.cargo/audit.toml`. Jedes Crate muss `[lints] workspace = true` haben,
-und eine Ausnahme läuft höchstens 12 Monate.
+`clippy.toml`, `.cargo/audit.toml` und Workflows. Jedes Crate muss `[lints] workspace = true` haben, und eine
+Ausnahme läuft höchstens 12 Monate. Hart rot sind außerdem: in `.cargo/config.toml` alles außer dem `xtask`-Alias
+(ein `runner` oder `rustc-wrapper` könnte Tests und Prüfprogramme abschalten), weitere Cargo-Konfigurationen und
+`rust-toolchain`-Dateien, mehrzeilige Texte und doppelte Schlüssel in den geprüften TOML-Dateien sowie Attribute aus
+Makro-Platzhaltern (`#[$m]`). Die CI prüft die Cargo-Konfiguration zuerst ohne Cargo und startet `scan` und
+`exceptions` als gebautes Programm, nicht über `cargo run`.
 
 ## Einmal je Klon
 ```
