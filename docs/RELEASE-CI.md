@@ -67,3 +67,12 @@ Keine Selbst-Update-Schleife: Das Setup trägt dieselbe Version wie `Cargo.toml`
 
 ## Nicht geprüft
 Ein echter Lauf bei GitHub (Windows-Runner: NSIS-Bereitstellung, Laufzeit, Tests ohne Grafikkarte) steht aus; geprüft sind Skripte und Katalogweg lokal. Das Setup ist nicht mit einem Zertifikat signiert (SmartScreen-Hinweis).
+
+## Brücke 0.2.0 (U3, 2026-11-26)
+
+Ab 0.2.0 liest der Launcher keinen Katalog mehr, sondern prüft je App `entry.json` mit GitHub-Nachweis (Kern `daedyx-update`).
+- Der eigene Crate `daedyx-update` mit dem Werkzeug `daedyx-catalog` ist gelöscht (Entscheid F1).
+- Die Veröffentlichung von 0.2.0 läuft ein letztes Mal über diesen alten Ablauf, damit installierte 0.1.0 die Brücke im alten Katalog finden.
+- `release.yml` holt dafür das Werkzeug aus `daedyx/releases` (`scripts/ci/fetch-catalog-tool.ps1`) und prüft mit `crates/launcher-core/assets/catalog.pub`.
+- Die Trockenprobe `scripts\ci\test-publish.ps1 -CatalogTool <daedyx-catalog.exe>` prüft das Ergebnis mit `daedyx-catalog verify`, nicht mehr mit der Kommandozeile des Launchers.
+- Ab 0.3.0 gilt der neue Weg: `entry.json` und Attestierung im öffentlichen Repo, Workflow `release.yml` auf `refs/heads/main` (plan-ohne-secrets 2, Schritt 8).

@@ -1,8 +1,25 @@
 # Stand
 
-Letzte Änderung: 2026-11-23
+Letzte Änderung: 2026-11-26 (U3: Launcher 0.2.0 „Brücke“ auf der gemeinsamen Update-Bibliothek, Zweig `launcher-u3`)
 
 ## Wo wir stehen
+- **U3: Launcher 0.2.0 „Brücke“ prüft mit der gemeinsamen Update-Bibliothek (2026-11-26, Zweig `launcher-u3` ab `paket-sicherheitsrahmen` 861ca2f, nicht in `main`):**
+  - **Gelöscht (Entscheid F1):** der eigene Crate `daedyx-update`, also Katalog, Katalog-Bearbeitung und minisign-Prüfung. Dazu gehören das Werkzeug `daedyx-catalog`, der Demo-Katalog, der E2E-Test mit lokalem Katalog sowie die Abnahmeskripte L3/L4.
+  - **Neue Grundlage:** Geprüft wird mit dem Kern `daedyx-update` (Tag `daedyx-update-v0.1.0`), also über den GitHub-Nachweis, ohne Schlüssel, Katalogadresse oder Token. Einstellen lässt sich nichts mehr. Die Kommandozeile hat kein `--catalog`/`--pubkey` und kein `config` mehr, die Oberfläche zeigt statt der Eingabefelder einen Hinweis auf die feste Quelle.
+  - **Feste App-Liste (`apps.rs`):** Desk (`daedyx/desk`, 1459020686, Eintrag `daedyx-desk`), Tasks (`daedyx/tasks`, 1464583596, `daedyx-tasks`) und der Launcher selbst (`daedyx/launcher`, 1457129506, `daedyx-launcher`). Der Besitzer ist jeweils 356409479; die Kennungen sind einmal mit `gh api` gelesen. Eine neue App bedeutet ein neues Launcher-Release; das ersetzt die geplante `apps.json`.
+  - **Suche (`lineup.rs`, `remote.rs`):**
+    - Je App werden `entry.json` und Bündel geholt und geprüft; ein Setup wird erst nach einem Auftrag geladen.
+    - Ohne Netz bleiben die Apps sichtbar, dazu kommt ein leiser Hinweis.
+    - Die höchste gesehene Version steht im eigenen Datenordner (`seen\<app>\updates.json`), nie bei der App.
+    - `minLauncherVersion` im Eintrag wird geprüft: Ein zu alter Launcher lädt nichts.
+  - **Netz (`net.rs`):** ureq 3.5.2 mit denselben Regeln wie `daedyx-updater`, ohne gzip. Es ist eine Abschrift, siehe Folgeauftrag „`net` in den Kern“.
+  - **Sperre:** gemeinsam mit den Apps unter `%LOCALAPPDATA%\daedyx\locks\<Eintrags-Kennung>.lock`, über die Kern-Sperre mit Kennung. Der alte Ort `<Datenordner>\locks` entfällt.
+  - **Selbst-Update:** wie bisher `/S /UPDATE [/NOLAUNCH]`, nur eine echt höhere geprüfte Version. Aufgeräumt werden alte Setups und `.part` im Ordner `downloads`, unter der Sperre und nie über eine Verknüpfung.
+  - **Tests:** launcher_core 72 und launcher_ui 79, ohne Netz (gefälschter Server, Attrappe für den Nachweis). Die Gegenprobe ohne Sperre und ohne „höchste gesehene Version“ ergibt 3 rote Tests.
+  - **Mindestzahlen:** gesenkt bzw. gestrichen, weil Code gelöscht ist (`xtask/testzahlen.txt`). Die Lockerung wartet auf das Ja des Betreuers.
+  - **Ausnahmen:** A-007, A-008, A-009, A-011 und A-016 sind ausgetragen (ihre Dateien sind gelöscht). Neue Ausnahme-Stellen gibt es nicht.
+  - **Veröffentlichung der Brücke:** einmal noch auf dem alten Weg. `release.yml` holt das Katalog-Werkzeug aus `daedyx/releases` (`fetch-catalog-tool.ps1`) und prüft mit `assets/catalog.pub`; beides bleibt für diesen einen Lauf. Das Setup enthält `daedyx-catalog.exe` nicht mehr.
+  - **Offen:** Ende-zu-Ende 0.2.0 → 0.3.0 mit echtem Nachweis (plan-ohne-secrets Weg A, Schritt 4), eine Installationsprobe des Launchers mit echtem Setup und die Frage, ob Board in die Liste kommt.
 - **Sicherheitsrahmen eingeführt (2026-11-23, Zweig `paket-sicherheitsrahmen`, nicht in `main`):** Lints erzwingen kein `unsafe`, keine Panik-Stellen und keine Konsolen-Ausgaben im Normalpfad; `cargo deny`/`cargo audit` als Lieferketten-Tor (`url` auf 2.5.9 wegen RUSTSEC-2026-0592); eigenes Prüfwerkzeug `cargo xtask scan`/`exceptions` mit Pre-Commit-Haken; CI-Workflow `ci.yml` bei jedem Push und Pull Request (ohne Secrets). Behoben: Überlauf in der Prozentanzeige bei riesigen Größen, Absturz bei vergiftetem Mutex, Index-Zugriffe. 23 eingetragene Ausnahmen mit Ablaufdatum in `docs/SICHERHEIT-AUSNAHMEN.md`. Offene Lücken (Download ohne Obergrenze während des Ladens, keine Zeitgrenze, alter Release-Ablauf mit Secrets) stehen in `docs/SICHERHEIT.md`.
 - **Meilenstein L4 fertig (2026-11-15, ohne Lizenz, ohne Veröffentlichung): Updates kommen von selbst, Launcher hat ein eigenes Gesicht.** 197 Tests grün, Clippy sauber, `scripts/l4-acceptance.ps1` (20 Prüfungen) bestanden.
   - **Eigenes Setup** `installer/launcher.nsi` (NSIS, pro Benutzer, Startmenü, Deinstallation, Symbol `installer/daedyx.ico`). Bauen: `scripts/build-setup.ps1` (liefert Setup, `launcher-catalog-entry.json` im Katalogformat, SHA-256). Schalter `/S /UPDATE [/NOLAUNCH]`: wartet, bis der laufende Launcher beendet ist, ersetzt ihn und startet ihn neu.

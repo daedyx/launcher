@@ -30,9 +30,10 @@ if (-not $SkipBuild) {
 }
 
 if ($RequireRealKey) {
-  $env:DAEDYX_REQUIRE_REAL_KEY = "1"
-  cargo test -p launcher-core fuer_das_setup_ist_ein_echter_schluessel_eingebaut
-  if ($LASTEXITCODE -ne 0) { throw "In crates\launcher-core\assets\catalog.pub steht noch kein echter öffentlicher Schlüssel." }
+  # Seit U3 prüft der Launcher keinen Katalog mehr. Der öffentliche Schlüssel dient nur noch publish.ps1, das die
+  # Brücke 0.2.0 ein letztes Mal in den alten Katalog einträgt (plan-ohne-secrets 3, Weg A).
+  $key = Get-Content "crates\launcher-core\assets\catalog.pub" -Raw
+  if ($key -notmatch 'minisign public key: [0-9A-F]{16}\s+RW[A-Za-z0-9+/=]{50,}') { throw "In crates\launcher-core\assets\catalog.pub steht noch kein echter öffentlicher Schlüssel." }
 }
 $flag = if ($Configuration -eq "release") { "--release" } else { "" }
 if (-not $SkipBuild) {
@@ -40,7 +41,7 @@ if (-not $SkipBuild) {
   if ($LASTEXITCODE -ne 0) { throw "Bauen fehlgeschlagen" }
 }
 $bin = Join-Path $repo "target\$Configuration"
-foreach ($f in "daedyx-launcher.exe","daedyx.exe","daedyx-catalog.exe") {
+foreach ($f in "daedyx-launcher.exe","daedyx.exe") {
   if (-not (Test-Path (Join-Path $bin $f))) { throw "$f fehlt in $bin" }
 }
 

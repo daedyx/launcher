@@ -3,11 +3,11 @@
 # dieselbe und eine niedrigere Version werden abgelehnt, ein vorhandener Eintrag von Desk und eine fremde
 # .gitattributes bleiben unberührt.
 # Die GitHub-Release-Datei (gh) wird hier ausgelassen.
-# Aufruf: scripts\ci\test-publish.ps1 -CatalogTool <daedyx-catalog.exe> -LauncherCli <daedyx.exe>
-param([Parameter(Mandatory)][string]$CatalogTool, [Parameter(Mandatory)][string]$LauncherCli)
+# Aufruf: scripts\ci\test-publish.ps1 -CatalogTool <daedyx-catalog.exe> (das Werkzeug aus daedyx/releases; seit U3
+# baut der Launcher es nicht mehr selbst, Entscheid F1)
+param([Parameter(Mandatory)][string]$CatalogTool)
 $ErrorActionPreference = "Continue"  # Erwartete Fehler (abgelehnte Versionen) dürfen die Probe nicht abbrechen; geprüft wird über Exit-Codes und throw
 $CatalogTool = (Resolve-Path $CatalogTool).Path
-$LauncherCli = (Resolve-Path $LauncherCli).Path
 $t = Join-Path ([System.IO.Path]::GetTempPath()) "daedyx-launcher-publish-test-$PID"
 New-Item -ItemType Directory -Force $t | Out-Null
 $oldKey = $env:DAEDYX_CATALOG_KEY; $oldPw = $env:DAEDYX_KEY_PASSWORD
@@ -75,16 +75,15 @@ try {
   if ((Publish "0.1.1") -eq 0) { throw "dieselbe Version wurde nicht abgelehnt" }
   if ((Publish "0.1.0") -eq 0) { throw "eine niedrigere Version wurde nicht abgelehnt" }
 
-  # Ergebnis prüfen: Katalog aus der Gegenstelle mit dem echten Launcher-CLI lesen (prüft Signatur und Schema)
+  # Ergebnis prüfen: Signatur des Katalogs aus der Gegenstelle mit dem Werkzeug (seit U3 liest der Launcher keinen Katalog)
   $check = Join-Path $t "check"
   git clone --quiet $remote $check 2>$null
   foreach ($f in "catalog.json", "catalog.json.minisig", "catalog.pub", "README.md", ".gitattributes") {
     if (-not (Test-Path (Join-Path $check $f))) { throw "Datei fehlt im Ergebnis: $f" }
   }
   if ((Get-Content (Join-Path $check ".gitattributes") -Raw) -notmatch "desk/latest.json") { throw ".gitattributes von Desk wurde überschrieben" }
-  $list = & $LauncherCli --catalog $check --pubkey (Join-Path $check "catalog.pub") --data-dir (Join-Path $t "ldata") list
-  Write-Output $list
-  if (($list -join " ") -notmatch "Daedyx Desk") { throw "Eintrag von Desk ist verloren gegangen" }
+  & $CatalogTool verify --catalog (Join-Path $check "catalog.json") --public (Join-Path $check "catalog.pub")
+  if ($LASTEXITCODE -ne 0) { throw "Signatur des Katalogs ungültig" }
   $cat = Get-Content (Join-Path $check "catalog.json") -Raw | ConvertFrom-Json
   $l = $cat.apps | Where-Object { $_.id -eq "launcher" }
   if ((($l.releases | ForEach-Object { $_.version }) -join ",") -ne "0.1.0,0.1.1") { throw "Versionen des Launchers im Katalog: $(($l.releases | ForEach-Object { $_.version }) -join ',')" }

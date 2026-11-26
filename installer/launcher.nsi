@@ -94,7 +94,6 @@ Section "Install"
   SetOutPath "$INSTDIR"
   File "${BINDIR}\daedyx-launcher.exe"
   File "${BINDIR}\daedyx.exe"
-  File "${BINDIR}\daedyx-catalog.exe"
   File "daedyx.ico"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
