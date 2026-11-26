@@ -5,12 +5,17 @@ edition.workspace = true
 publish.workspace = true
 license = "MIT"
 
+[features]
+# Installationsprobe ohne Nachweis (probe_local.rs, scripts/installer-probe-launcher.ps1). Nie im Setup ohne -Probe.
+probe = []
+
 [dependencies]
 daedyx-update.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-ureq.workspace = true
+# Zweite Prüfung des Setups über einen gesperrten Griff (held.rs, Review U3 M-U3-1).
+sha2.workspace = true
 dirs.workspace = true
 sysinfo.workspace = true
 
@@ -19,7 +24,6 @@ winreg.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-sha2.workspace = true
 
 [lints]
 workspace = true

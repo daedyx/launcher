@@ -1,8 +1,10 @@
 //! Selbst-Update des Launchers (U3): Das Setup kommt aus dem eigenen Repo `daedyx/launcher` und wird wie jedes Paket
 //! geprüft (GitHub-Nachweis, Eintrag, Größe, SHA-256), dann still gestartet; danach beendet der Aufrufer den Launcher,
 //! und das Setup ersetzt ihn und startet ihn neu. Nur eine echt höhere Version, so bleibt eine Update-Schleife aus.
-use crate::apps::{LAUNCHER, LAUNCHER_ID};
+use crate::apps::{APPS, LAUNCHER, LAUNCHER_ID};
 use crate::error::CoreError;
+use crate::held::Held;
+use crate::install::held_error;
 use crate::lineup::Lineup;
 use crate::service::Launcher;
 use serde::Serialize;
@@ -48,9 +50,12 @@ impl Launcher {
         let _lock = self.lock(&LAUNCHER)?;
         let setup = self
             .remote
-            .fetch(&policy, offer, &self.downloads_dir(), &mut |d, t| {
-                progress(d, Some(t))
-            })
+            .fetch(
+                &policy,
+                offer,
+                &self.app_downloads(&LAUNCHER),
+                &mut |d, t| progress(d, Some(t)),
+            )
             .map_err(|blocked| CoreError::Blocked {
                 app: LAUNCHER_ID.to_string(),
                 blocked,
@@ -61,7 +66,17 @@ impl Launcher {
         } else {
             &["/S", "/UPDATE", "/NOLAUNCH"]
         };
-        if let Err(e) = self.system.start_detached(&setup, args) {
+        // Zweite Prüfung über einen gesperrten Griff, gehalten bis der Start zurückkommt (M-U3-1).
+        let held = match Held::open(&setup, &offer.entry().package.sha256) {
+            Ok(h) => h,
+            Err(e) => {
+                let _ = std::fs::remove_file(&setup);
+                return Err(held_error(LAUNCHER_ID, e));
+            }
+        };
+        let started = self.system.start_detached(&setup, args);
+        drop(held);
+        if let Err(e) = started {
             let _ = std::fs::remove_file(&setup);
             return Err(CoreError::Io(e));
         }
@@ -72,11 +87,14 @@ impl Launcher {
         self.data_dir.join("downloads")
     }
 
-    /// Löscht übrig gebliebene Setups und abgebrochene Downloads (beim Start aufrufen). Nur unter der Sperre des
-    /// Launchers, damit kein laufender Download eines zweiten Launchers verschwindet; Verknüpfungen bleiben unberührt.
+    /// Löscht übrig gebliebene Setups und abgebrochene Downloads (beim Start aufrufen): je App nur in ihrem eigenen
+    /// Ordner und nur unter ihrer Sperre. Ist eine Sperre belegt (ein zweiter Launcher oder die App lädt gerade),
+    /// bleibt dieser Ordner unberührt (Review U3 N-U3-1). Verknüpfungen werden nie betreten.
     pub fn clean_self_update_leftovers(&self) {
-        if let Ok(_lock) = self.lock(&LAUNCHER) {
-            let _ = daedyx_update::download::clean_leftovers(&self.downloads_dir());
+        for app in APPS.iter().chain(std::iter::once(&LAUNCHER)) {
+            if let Ok(_lock) = self.lock(app) {
+                let _ = daedyx_update::download::clean_leftovers(&self.app_downloads(app));
+            }
         }
     }
 }

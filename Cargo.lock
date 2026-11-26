@@ -916,7 +916,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 [[package]]
 name = "daedyx-update"
 version = "0.2.3"
-source = "git+https://github.com/daedyx/core?tag=daedyx-update-v0.1.0#65252ba0f7f0f91ce3b23b80f96000a15eeda406"
+source = "git+https://github.com/daedyx/core?rev=5bcb3d18d6b73a480a9db5a8ff2ee4b8ee3483fd#5bcb3d18d6b73a480a9db5a8ff2ee4b8ee3483fd"
 dependencies = [
  "attestation-verify",
  "hex",
@@ -925,6 +925,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror 2.0.21",
+ "ureq",
 ]
 
 [[package]]
@@ -2141,7 +2142,6 @@ dependencies = [
  "sysinfo",
  "tempfile",
  "thiserror 2.0.21",
- "ureq",
  "winreg",
 ]
 

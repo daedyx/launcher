@@ -19,15 +19,25 @@ SetCompressor /SOLID lzma
   !define OUTFILE "Daedyx-Launcher_${VERSION}_x64-setup.exe"
 !endif
 
-!define APPNAME "Daedyx Launcher"
-!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Daedyx Launcher"
+; Installationsprobe (scripts\build-setup.ps1 -Probe, Review U3 F-U3-2): eigene Kennung, damit eine echte Installation
+; „Daedyx Launcher“ nie berührt wird.
+!ifdef PROBE
+  !define APPNAME "Daedyx Launcher Probe"
+  !define DIRKEY "Software\Daedyx\LauncherProbe"
+  !define RUNVALUE "DaedyxLauncherProbe"
+!else
+  !define APPNAME "Daedyx Launcher"
+  !define DIRKEY "Software\Daedyx\Launcher"
+  !define RUNVALUE "DaedyxLauncher"
+!endif
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
 !define RUNKEY "Software\Microsoft\Windows\CurrentVersion\Run"
 
 Name "${APPNAME}"
 OutFile "${OUTFILE}"
-InstallDir "$LOCALAPPDATA\Programs\Daedyx Launcher"
+InstallDir "$LOCALAPPDATA\Programs\${APPNAME}"
 ; Bei einem Update derselbe Ordner wie bei der ersten Installation
-InstallDirRegKey HKCU "Software\Daedyx\Launcher" "InstallDir"
+InstallDirRegKey HKCU "${DIRKEY}" "InstallDir"
 VIProductVersion "${VERSION}.0"
 VIAddVersionKey "ProductName" "${APPNAME}"
 VIAddVersionKey "FileVersion" "${VERSION}"
@@ -70,14 +80,17 @@ Function .onInit
   ${EndIf}
 FunctionEnd
 
-; Der Launcher, der das Setup gestartet hat, beendet sich gleich danach. Solange seine Datei
-; noch in Benutzung ist, lässt sie sich nicht löschen: bis zu 20 Sekunden warten.
+; Der Launcher (Fenster oder Kommandozeile), der das Setup gestartet hat, beendet sich gleich danach. Solange seine
+; Datei noch in Benutzung ist, lässt sie sich nicht löschen: bis zu 20 Sekunden auf beide Programme warten (U3: auch
+; `daedyx.exe`, sonst scheitert ein Selbst-Update aus der Kommandozeile am Überschreiben).
 Function WaitForLauncher
   StrCpy $0 0
   loop:
     ClearErrors
     Delete "$INSTDIR\daedyx-launcher.exe"
+    Delete "$INSTDIR\daedyx.exe"
     ${IfNot} ${FileExists} "$INSTDIR\daedyx-launcher.exe"
+    ${AndIfNot} ${FileExists} "$INSTDIR\daedyx.exe"
       Return
     ${EndIf}
     Sleep 500
@@ -95,11 +108,13 @@ Section "Install"
   File "${BINDIR}\daedyx-launcher.exe"
   File "${BINDIR}\daedyx.exe"
   File "daedyx.ico"
+  ; Seit 0.2.0 (U3) ohne Katalog-Werkzeug: das Programm einer älteren Fassung beim Update entfernen (F-U3-6).
+  Delete "$INSTDIR\daedyx-catalog.exe"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
-  CreateShortcut "$SMPROGRAMS\Daedyx Launcher.lnk" "$INSTDIR\daedyx-launcher.exe" "" "$INSTDIR\daedyx.ico"
+  CreateShortcut "$SMPROGRAMS\${APPNAME}.lnk" "$INSTDIR\daedyx-launcher.exe" "" "$INSTDIR\daedyx.ico"
 
-  WriteRegStr HKCU "Software\Daedyx\Launcher" "InstallDir" "$INSTDIR"
+  WriteRegStr HKCU "${DIRKEY}" "InstallDir" "$INSTDIR"
   WriteRegStr HKCU "${UNINSTKEY}" "DisplayName" "${APPNAME}"
   WriteRegStr HKCU "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKCU "${UNINSTKEY}" "Publisher" "daedyx"
@@ -124,10 +139,10 @@ Section "Uninstall"
   Delete "$INSTDIR\daedyx.ico"
   Delete "$INSTDIR\uninstall.exe"
   RMDir "$INSTDIR"
-  Delete "$SMPROGRAMS\Daedyx Launcher.lnk"
-  DeleteRegValue HKCU "${RUNKEY}" "DaedyxLauncher"
+  Delete "$SMPROGRAMS\${APPNAME}.lnk"
+  DeleteRegValue HKCU "${RUNKEY}" "${RUNVALUE}"
   DeleteRegKey HKCU "${UNINSTKEY}"
-  DeleteRegKey HKCU "Software\Daedyx\Launcher"
+  DeleteRegKey HKCU "${DIRKEY}"
   DeleteRegKey /ifempty HKCU "Software\Daedyx"
   ; Die mit dem Launcher installierten Apps und die Einstellungen bleiben bestehen.
 SectionEnd

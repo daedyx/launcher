@@ -17,6 +17,8 @@ required-features = ["test-helpers"]
 
 [features]
 test-helpers = []
+# Befehle der Installationsprobe (probe-install, probe-self-update), nur für scripts/installer-probe-launcher.ps1.
+probe = ["launcher-core/probe"]
 
 [dependencies]
 launcher-core = { path = "../launcher-core" }

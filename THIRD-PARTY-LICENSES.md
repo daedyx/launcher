@@ -4,7 +4,7 @@ Dieses Projekt steht unter der MIT-Lizenz (siehe `LICENSE`). Es verwendet die fo
 
 Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten neu erzeugen.
 
-## Rust-Bibliotheken (499)
+## Rust-Bibliotheken (512)
 
 | Paket | Version | Lizenz | Quelle |
 |---|---|---|---|
@@ -48,13 +48,15 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | atspi | 0.29.0 | Apache-2.0 OR MIT | https://github.com/odilia-app/atspi |
 | atspi-common | 0.13.0 | Apache-2.0 OR MIT | https://github.com/odilia-app/atspi |
 | atspi-proxies | 0.13.0 | Apache-2.0 OR MIT | https://github.com/odilia-app/atspi |
+| attestation-verify | 0.1.0 | MIT OR Apache-2.0 | https://github.com/combinatrix-ai/attestation-verify |
 | autocfg | 1.5.1 | Apache-2.0 OR MIT | https://github.com/cuviper/autocfg |
+| base16ct | 1.0.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | base64 | 0.23.1 | MIT OR Apache-2.0 | https://github.com/marshallpierce/rust-base64 |
+| base64ct | 1.8.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | bit-set | 0.10.0 | Apache-2.0 OR MIT | https://github.com/contain-rs/bit-set |
 | bit-vec | 0.9.1 | Apache-2.0 OR MIT | https://github.com/contain-rs/bit-vec |
 | bitflags | 1.3.2 | MIT/Apache-2.0 | https://github.com/bitflags/bitflags |
 | bitflags | 2.13.2 | MIT OR Apache-2.0 | https://github.com/bitflags/bitflags |
-| block-buffer | 0.10.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block-buffer | 0.12.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | block2 | 0.5.1 | MIT | https://github.com/madsmtm/objc2 |
 | block2 | 0.6.2 | MIT | https://github.com/madsmtm/objc2 |
@@ -72,12 +74,12 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | cfg-if | 1.0.5 | MIT OR Apache-2.0 | https://github.com/rust-lang/cfg-if |
 | cfg_aliases | 0.2.2 | MIT | https://github.com/katharostech/cfg_aliases |
 | cgl | 0.3.2 | MIT / Apache-2.0 | https://github.com/servo/cgl-rs |
-| cipher | 0.4.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | clap | 4.6.7 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clap_builder | 4.6.7 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clap_derive | 4.6.7 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clap_lex | 1.1.1 | MIT OR Apache-2.0 | https://github.com/clap-rs/clap |
 | clipboard-win | 5.4.3 | BSL-1.0 | https://github.com/DoumanAsh/clipboard-win |
+| cmov | 0.5.4 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | codespan-reporting | 0.13.1 | Apache-2.0 | https://github.com/brendanzab/codespan |
 | color | 0.3.3 | Apache-2.0 OR MIT | https://github.com/linebender/color |
 | colorchoice | 1.0.5 | MIT OR Apache-2.0 | https://github.com/rust-cli/anstyle.git |
@@ -88,16 +90,18 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | core-foundation-sys | 0.8.7 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | core-graphics | 0.23.2 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
 | core-graphics-types | 0.1.3 | MIT OR Apache-2.0 | https://github.com/servo/core-foundation-rs |
-| cpufeatures | 0.2.17 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
+| cpubits | 0.1.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | cpufeatures | 0.3.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | crc32fast | 1.5.5 | MIT OR Apache-2.0 | https://github.com/srijs/rust-crc32fast |
 | crossbeam-utils | 0.8.23 | MIT OR Apache-2.0 | https://github.com/crossbeam-rs/crossbeam |
 | crunchy | 0.2.4 | MIT | https://github.com/eira-fransham/crunchy |
-| crypto-common | 0.1.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
+| crypto-bigint | 0.7.11 | Apache-2.0 OR MIT | https://github.com/RustCrypto/crypto-bigint |
 | crypto-common | 0.2.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
-| ct-codecs | 1.1.8 | MIT | https://github.com/jedisct1/rust-ct-codecs |
+| ctutils | 0.4.8 | Apache-2.0 OR MIT | https://github.com/RustCrypto/utils |
 | cursor-icon | 1.2.0 | MIT OR Apache-2.0 OR Zlib | https://github.com/rust-windowing/cursor-icon |
-| digest | 0.10.7 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
+| daedyx-update | 0.2.3 | MIT | https://github.com/daedyx/core |
+| der | 0.8.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
+| der_derive | 0.8.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | digest | 0.11.3 | MIT OR Apache-2.0 | https://github.com/RustCrypto/traits |
 | dirs | 7.0.0 | MIT OR Apache-2.0 | https://codeberg.org/dirs/dirs-rs |
 | dirs-sys | 0.5.0 | MIT OR Apache-2.0 | https://github.com/dirs-dev/dirs-sys-rs |
@@ -108,6 +112,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | document-features | 0.2.12 | MIT OR Apache-2.0 | https://github.com/slint-ui/document-features |
 | downcast-rs | 1.2.1 | MIT/Apache-2.0 | https://github.com/marcianx/downcast-rs |
 | dpi | 0.1.2 | Apache-2.0 AND MIT | https://github.com/rust-windowing/winit |
+| ecdsa | 0.17.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/signatures |
 | ecolor | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui |
 | eframe | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui/tree/main/crates/eframe |
 | egui | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui |
@@ -117,6 +122,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | egui_kittest | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui |
 | egui_system_font_provider | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui/tree/main/crates/egui_system_font_provider |
 | either | 1.19.0 | MIT OR Apache-2.0 | https://github.com/rayon-rs/either |
+| elliptic-curve | 0.14.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/traits |
 | emath | 0.37.0 | MIT OR Apache-2.0 | https://github.com/emilk/egui/tree/main/crates/emath |
 | endi | 1.1.1 | MIT | https://github.com/zeenix/endi |
 | enumflags2 | 0.7.12 | MIT OR Apache-2.0 | https://github.com/meithecatte/enumflags2 |
@@ -133,8 +139,11 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | fax | 0.2.7 | MIT | https://github.com/pdf-rs/fax |
 | fdeflate | 0.3.7 | MIT OR Apache-2.0 | https://github.com/image-rs/fdeflate |
 | fearless_simd | 0.4.1 | Apache-2.0 OR MIT | https://github.com/linebender/fearless_simd |
+| ff | 0.14.0 | MIT/Apache-2.0 | https://github.com/zkcrypto/ff |
+| fiat-crypto | 0.3.0 | MIT OR Apache-2.0 OR BSD-1-Clause | https://github.com/mit-plv/fiat-crypto |
 | find-msvc-tools | 0.1.15 | MIT OR Apache-2.0 | https://github.com/rust-lang/cc-rs |
 | fixedbitset | 0.5.9 | MIT OR Apache-2.0 | https://github.com/petgraph/fixedbitset |
+| flagset | 0.4.7 | Apache-2.0 | https://github.com/enarx/flagset |
 | flate2 | 1.1.11 | MIT OR Apache-2.0 | https://github.com/rust-lang/flate2-rs |
 | foldhash | 0.1.5 | Zlib | https://github.com/orlp/foldhash |
 | foldhash | 0.2.0 | Zlib | https://github.com/orlp/foldhash |
@@ -143,14 +152,13 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | foreign-types | 0.5.0 | MIT/Apache-2.0 | https://github.com/sfackler/foreign-types |
 | foreign-types-macros | 0.2.4 | MIT/Apache-2.0 | https://github.com/sfackler/foreign-types |
 | foreign-types-shared | 0.3.1 | MIT/Apache-2.0 | https://github.com/sfackler/foreign-types |
-| form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
+| form_urlencoded | 1.2.3 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
 | futures-core | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-io | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-lite | 2.6.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/futures-lite |
 | futures-macro | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-task | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
 | futures-util | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/futures-rs |
-| generic-array | 0.14.7 | MIT | https://github.com/fizyk20/generic-array.git |
 | gethostname | 1.1.0 | Apache-2.0 | https://codeberg.org/swsnr/gethostname.rs.git |
 | getrandom | 0.2.17 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
 | getrandom | 0.3.4 | MIT OR Apache-2.0 | https://github.com/rust-random/getrandom |
@@ -164,6 +172,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | glutin_glx_sys | 0.6.1 | Apache-2.0 | https://github.com/rust-windowing/glutin |
 | glutin_wgl_sys | 0.6.1 | Apache-2.0 | https://github.com/rust-windowing/glutin |
 | gpu-allocator | 0.28.0 | MIT OR Apache-2.0 | https://github.com/Traverse-Research/gpu-allocator |
+| group | 0.14.0 | MIT/Apache-2.0 | https://github.com/zkcrypto/group |
 | guillotiere | 0.7.0 | MIT/Apache-2.0 | https://github.com/nical/guillotiere |
 | half | 2.7.1 | MIT OR Apache-2.0 | https://github.com/VoidStarKat/half-rs |
 | harfrust | 0.12.0 | MIT | https://github.com/harfbuzz/harfrust |
@@ -173,7 +182,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | heck | 0.5.0 | MIT OR Apache-2.0 | https://github.com/withoutboats/heck |
 | hermit-abi | 0.5.3 | MIT OR Apache-2.0 | https://github.com/hermit-os/hermit-rs |
 | hex | 0.4.3 | MIT OR Apache-2.0 | https://github.com/KokaKiwi/rust-hex |
-| hmac | 0.12.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/MACs |
+| hmac | 0.13.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/MACs |
 | http | 1.5.0 | MIT OR Apache-2.0 | https://github.com/hyperium/http |
 | httparse | 1.10.1 | MIT OR Apache-2.0 | https://github.com/seanmonstar/httparse |
 | hybrid-array | 0.4.15 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hybrid-array |
@@ -188,7 +197,6 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | idna_adapter | 1.2.2 | Apache-2.0 OR MIT | https://github.com/hsivonen/idna_adapter |
 | image | 0.25.10 | MIT OR Apache-2.0 | https://github.com/image-rs/image |
 | indexmap | 2.14.2 | Apache-2.0 OR MIT | https://github.com/indexmap-rs/indexmap |
-| inout | 0.1.4 | MIT OR Apache-2.0 | https://github.com/RustCrypto/utils |
 | is_terminal_polyfill | 1.70.2 | MIT OR Apache-2.0 | https://github.com/polyfill-rs/is_terminal_polyfill |
 | itertools | 0.15.0 | MIT OR Apache-2.0 | https://github.com/rust-itertools/itertools |
 | itoa | 1.0.19 | MIT OR Apache-2.0 | https://github.com/dtolnay/itoa |
@@ -208,8 +216,8 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | libm | 0.2.16 | MIT | https://github.com/rust-lang/compiler-builtins |
 | libredox | 0.1.25 | MIT | https://gitlab.redox-os.org/redox-os/libredox.git |
 | linebender_resource_handle | 0.1.1 | Apache-2.0 OR MIT | https://github.com/linebender/raw_resource_handle |
-| linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
 | linux-raw-sys | 0.4.15 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
+| linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/sunfishcode/linux-raw-sys |
 | litemap | 0.8.3 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | litrs | 1.0.1 | MIT OR Apache-2.0 | https://github.com/LukasKalbertodt/litrs |
 | lock_api | 0.4.14 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
@@ -217,8 +225,6 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | memchr | 2.8.3 | Unlicense OR MIT | https://github.com/BurntSushi/memchr |
 | memmap2 | 0.9.12 | MIT OR Apache-2.0 | https://github.com/RazrFalcon/memmap2-rs |
 | memoffset | 0.9.1 | MIT | https://github.com/Gilnaa/memoffset |
-| minisign | 0.10.0 | MIT | https://github.com/jedisct1/rust-minisign |
-| minisign-verify | 0.3.0 | MIT | https://github.com/jedisct1/rust-minisign-verify |
 | miniz_oxide | 0.8.9 | MIT OR Zlib OR Apache-2.0 | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide |
 | miniz_oxide | 0.9.1 | MIT OR Zlib OR Apache-2.0 | https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide |
 | moxcms | 0.8.1 | BSD-3-Clause OR Apache-2.0 | https://github.com/awxkee/moxcms.git |
@@ -269,11 +275,12 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | ordered-stream | 0.2.0 | MIT OR Apache-2.0 | https://github.com/danieldg/ordered-stream |
 | os_pipe | 1.2.3 | MIT | https://github.com/oconnor663/os_pipe.rs |
 | owned_ttf_parser | 0.25.1 | Apache-2.0 | https://github.com/alexheretic/owned-ttf-parser |
+| p256 | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
+| p384 | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | parking | 2.2.1 | Apache-2.0 OR MIT | https://github.com/smol-rs/parking |
 | parking_lot | 0.12.5 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | parking_lot_core | 0.9.12 | MIT OR Apache-2.0 | https://github.com/Amanieu/parking_lot |
 | parlance | 0.1.1 | Apache-2.0 OR MIT | https://github.com/linebender/parley |
-| pbkdf2 | 0.12.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/password-hashes/tree/master/pbkdf2 |
 | peniko | 0.6.1 | Apache-2.0 OR MIT | https://github.com/linebender/peniko |
 | percent-encoding | 2.3.2 | MIT OR Apache-2.0 | https://github.com/servo/rust-url/ |
 | petgraph | 0.8.3 | MIT OR Apache-2.0 | https://github.com/petgraph/petgraph |
@@ -285,6 +292,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | pin-project-internal | 1.1.13 | Apache-2.0 OR MIT | https://github.com/taiki-e/pin-project |
 | pin-project-lite | 0.2.17 | Apache-2.0 OR MIT | https://github.com/taiki-e/pin-project-lite |
 | piper | 0.2.5 | MIT OR Apache-2.0 | https://github.com/smol-rs/piper |
+| pkcs8 | 0.11.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | pkg-config | 0.3.34 | MIT OR Apache-2.0 | https://github.com/rust-lang/pkg-config-rs |
 | plain | 0.2.3 | MIT/Apache-2.0 | https://github.com/randomites/plain |
 | png | 0.18.1 | MIT OR Apache-2.0 | https://github.com/image-rs/image-png |
@@ -296,6 +304,8 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | portable-atomic-util | 0.2.8 | Apache-2.0 OR MIT | https://github.com/taiki-e/portable-atomic-util |
 | potential_utf | 0.1.6 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | presser | 0.3.1 | MIT OR Apache-2.0 | https://github.com/EmbarkStudios/presser |
+| primefield | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
+| primeorder | 0.14.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | proc-macro-crate | 3.5.0 | MIT OR Apache-2.0 | https://github.com/bkchr/proc-macro-crate |
 | proc-macro2 | 1.0.107 | MIT OR Apache-2.0 | https://github.com/dtolnay/proc-macro2 |
 | profiling | 1.0.18 | MIT OR Apache-2.0 | https://github.com/aclysma/profiling |
@@ -305,6 +315,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | quote | 1.0.47 | MIT OR Apache-2.0 | https://github.com/dtolnay/quote |
 | r-efi | 5.3.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later | https://github.com/r-efi/r-efi |
 | r-efi | 6.0.0 | MIT OR Apache-2.0 OR LGPL-2.1-or-later | https://github.com/r-efi/r-efi |
+| rand_core | 0.10.1 | MIT OR Apache-2.0 | https://github.com/rust-random/rand_core |
 | range-alloc | 0.1.5 | MIT OR Apache-2.0 | https://github.com/gfx-rs/range-alloc |
 | raw-window-handle | 0.6.2 | MIT OR Apache-2.0 OR Zlib | https://github.com/rust-windowing/raw-window-handle |
 | raw-window-metal | 1.1.0 | MIT OR Apache-2.0 | https://github.com/rust-windowing/raw-window-metal |
@@ -314,10 +325,9 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | redox_syscall | 0.9.5 | MIT | https://gitlab.redox-os.org/redox-os/kernel |
 | redox_users | 0.5.3 | MIT | https://gitlab.redox-os.org/redox-os/users |
 | renderdoc-sys | 1.1.0 | MIT OR Apache-2.0 | https://github.com/ebkalderon/renderdoc-rs |
+| rfc6979 | 0.6.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/signatures |
 | ring | 0.17.14 | Apache-2.0 AND ISC | https://github.com/briansmith/ring |
 | roxmltree | 0.21.2 | MIT OR Apache-2.0 | https://github.com/RazrFalcon/roxmltree |
-| rpassword | 7.5.5 | Apache-2.0 | https://github.com/conradkleinespel/rpassword |
-| rtoolbox | 0.0.6 | Apache-2.0 | https://github.com/conradkleinespel/rtoolbox |
 | rustc-hash | 1.1.0 | Apache-2.0/MIT | https://github.com/rust-lang-nursery/rustc-hash |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | https://github.com/rust-lang/rustc-hash |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | https://github.com/djc/rustc-version-rs |
@@ -327,12 +337,11 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | rustls-pki-types | 1.16.0 | MIT OR Apache-2.0 | https://github.com/rustls/pki-types |
 | rustls-webpki | 0.103.17 | ISC | https://github.com/rustls/webpki |
 | rustversion | 1.0.23 | MIT OR Apache-2.0 | https://github.com/dtolnay/rustversion |
-| salsa20 | 0.10.2 | MIT OR Apache-2.0 | https://github.com/RustCrypto/stream-ciphers |
 | same-file | 1.0.6 | Unlicense/MIT | https://github.com/BurntSushi/same-file |
 | scoped-tls | 1.0.1 | MIT/Apache-2.0 | https://github.com/alexcrichton/scoped-tls |
 | scopeguard | 1.2.0 | MIT OR Apache-2.0 | https://github.com/bluss/scopeguard |
-| scrypt | 0.11.0 | MIT OR Apache-2.0 | https://github.com/RustCrypto/password-hashes/tree/master/scrypt |
 | sctk-adwaita | 0.10.1 | MIT | https://github.com/PolyMeilex/sctk-adwaita |
+| sec1 | 0.8.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | self_cell | 1.3.0 | Apache-2.0 OR GPL-2.0-only | https://github.com/Voultapher/self_cell |
 | semver | 1.0.28 | MIT OR Apache-2.0 | https://github.com/dtolnay/semver |
 | send_wrapper | 0.6.0 | MIT/Apache-2.0 | https://github.com/thk1/send_wrapper |
@@ -342,10 +351,11 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | https://github.com/serde-rs/json |
 | serde_repr | 0.1.21 | MIT OR Apache-2.0 | https://github.com/dtolnay/serde-repr |
 | serde_spanned | 1.1.3 | MIT OR Apache-2.0 | https://github.com/toml-rs/toml |
-| sha2 | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
+| serdect | 0.4.3 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | sha2 | 0.11.1 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | shlex | 2.0.1 | MIT OR Apache-2.0 | https://github.com/comex/rust-shlex |
 | signal-hook-registry | 1.4.8 | MIT OR Apache-2.0 | https://github.com/vorner/signal-hook |
+| signature | 3.0.0 | Apache-2.0 OR MIT | https://github.com/RustCrypto/traits |
 | simd-adler32 | 0.3.10 | MIT | https://github.com/mcountryman/simd-adler32 |
 | simd_cesu8 | 1.2.0 | Apache-2.0 OR MIT | https://github.com/seancroach/simd_cesu8 |
 | simdutf8 | 0.1.5 | MIT OR Apache-2.0 | https://github.com/rusticstuff/simdutf8 |
@@ -359,6 +369,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | smithay-clipboard | 0.7.3 | MIT | https://github.com/smithay/smithay-clipboard |
 | smol_str | 0.2.2 | MIT OR Apache-2.0 | https://github.com/rust-analyzer/smol_str |
 | spirv | 0.4.0+sdk-1.4.341.0 | Apache-2.0 | https://github.com/gfx-rs/rspirv |
+| spki | 0.8.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | stable_deref_trait | 1.2.1 | MIT OR Apache-2.0 | https://github.com/storyyeller/stable_deref_trait |
 | static_assertions | 1.1.0 | MIT OR Apache-2.0 | https://github.com/nvzqz/static-assertions-rs |
 | strict-num | 0.1.1 | MIT | https://github.com/RazrFalcon/strict-num |
@@ -401,7 +412,7 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | untrusted | 0.9.0 | ISC | https://github.com/briansmith/untrusted |
 | ureq | 3.5.2 | MIT OR Apache-2.0 | https://github.com/algesten/ureq |
 | ureq-proto | 0.7.1 | MIT OR Apache-2.0 | https://github.com/algesten/ureq-proto |
-| url | 2.5.8 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
+| url | 2.5.9 | MIT OR Apache-2.0 | https://github.com/servo/rust-url |
 | utf8-zero | 0.8.1 | MIT OR Apache-2.0 | https://github.com/algesten/utf8-zero |
 | utf8_iter | 1.1.0 | Apache-2.0 OR MIT | https://github.com/hsivonen/utf8_iter |
 | utf8parse | 0.2.2 | Apache-2.0 OR MIT | https://github.com/alacritty/vte |
@@ -474,10 +485,12 @@ Erzeugt aus den Sperrdateien (`Cargo.lock`); bei Änderungen der Abhängigkeiten
 | winreg | 0.56.0 | MIT | https://github.com/gentoo90/winreg-rs |
 | wit-bindgen | 0.57.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | https://github.com/bytecodealliance/wit-bindgen |
 | wl-clipboard-rs | 0.9.5 | MIT OR Apache-2.0 | https://github.com/YaLTeR/wl-clipboard-rs |
+| wnaf | 0.14.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/elliptic-curves |
 | writeable | 0.6.4 | Unicode-3.0 | https://github.com/unicode-org/icu4x |
 | x11-dl | 2.21.0 | MIT | https://github.com/AltF02/x11-rs.git |
 | x11rb | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
 | x11rb-protocol | 0.13.2 | MIT OR Apache-2.0 | https://github.com/psychon/x11rb |
+| x509-cert | 0.3.1 | Apache-2.0 OR MIT | https://github.com/RustCrypto/formats |
 | xcursor | 0.3.11 | MIT | https://github.com/esposm03/xcursor-rs |
 | xkbcommon-dl | 0.4.2 | MIT | https://github.com/rust-windowing/xkbcommon-dl |
 | xkeysym | 0.2.1 | MIT OR Apache-2.0 OR Zlib | https://github.com/notgull/xkeysym |

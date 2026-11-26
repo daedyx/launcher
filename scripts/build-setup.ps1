@@ -9,7 +9,9 @@ param(
   [string]$BaseUrl = "",                 # ohne Angabe: relative Adresse packages/<Datei> (lokaler Katalogordner)
   [ValidateSet("release","debug")][string]$Configuration = "release",
   [switch]$SkipBuild,                    # Programme nicht neu bauen (Proben)
-  [switch]$RequireRealKey                # bricht ab, solange assets\catalog.pub ein Platzhalter ist
+  [switch]$RequireRealKey,               # bricht ab, solange assets\catalog.pub ein Platzhalter ist
+  [switch]$Probe,                        # nur Installationsprobe: Kennung „Daedyx Launcher Probe“, Merkmal probe (nie im Release)
+  [string]$TargetDir = ""                # Bauordner (Standard: target im Repo)
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -37,10 +39,16 @@ if ($RequireRealKey) {
 }
 $flag = if ($Configuration -eq "release") { "--release" } else { "" }
 if (-not $SkipBuild) {
-  cargo build $flag -p launcher-ui -p launcher-cli
+  if ($TargetDir) { $env:CARGO_TARGET_DIR = $TargetDir }
+  if ($Probe) {
+    cargo build $flag -p launcher-ui -p launcher-cli --features launcher-cli/probe
+  } else {
+    cargo build $flag -p launcher-ui -p launcher-cli
+  }
   if ($LASTEXITCODE -ne 0) { throw "Bauen fehlgeschlagen" }
 }
-$bin = Join-Path $repo "target\$Configuration"
+$root = if ($TargetDir) { $TargetDir } else { Join-Path $repo "target" }
+$bin = Join-Path $root $Configuration
 foreach ($f in "daedyx-launcher.exe","daedyx.exe") {
   if (-not (Test-Path (Join-Path $bin $f))) { throw "$f fehlt in $bin" }
 }
@@ -52,9 +60,10 @@ if (-not $makensis) { throw "makensis nicht gefunden (NSIS installieren)" }
 
 $out = Join-Path $repo "dist\$Version"
 New-Item -ItemType Directory -Force $out | Out-Null
-$name = "Daedyx-Launcher_${Version}_x64-setup.exe"
+$name = if ($Probe) { "Daedyx-Launcher-Probe_${Version}_x64-setup.exe" } else { "Daedyx-Launcher_${Version}_x64-setup.exe" }
 $setup = Join-Path $out $name
-& $makensis /V2 "/DVERSION=$Version" "/DBINDIR=$bin" "/DOUTFILE=$setup" (Join-Path $repo "installer\launcher.nsi")
+$probeDef = if ($Probe) { "/DPROBE" } else { "/DNOPROBE" }
+& $makensis /V2 "/DVERSION=$Version" "/DBINDIR=$bin" "/DOUTFILE=$setup" $probeDef (Join-Path $repo "installer\launcher.nsi")
 if ($LASTEXITCODE -ne 0) { throw "makensis fehlgeschlagen" }
 
 $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()

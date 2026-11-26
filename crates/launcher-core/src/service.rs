@@ -48,7 +48,7 @@ pub(crate) fn newer(candidate: &str, installed: &str) -> bool {
     }
 }
 
-fn known(app_id: &str) -> Result<&'static KnownApp, CoreError> {
+pub(crate) fn known(app_id: &str) -> Result<&'static KnownApp, CoreError> {
     apps::APPS
         .iter()
         .find(|a| a.id == app_id)
@@ -78,7 +78,7 @@ impl Launcher {
         self.data_dir.join("apps")
     }
 
-    fn is_running(&self, dir: &PathBuf) -> bool {
+    pub(crate) fn is_running(&self, dir: &PathBuf) -> bool {
         self.system
             .running(std::slice::from_ref(dir))
             .first()
@@ -168,98 +168,5 @@ impl Launcher {
             .filter(|(_, running)| *running)
             .map(|((id, _), _)| id)
             .collect())
-    }
-
-    /// Installiert die neueste geprüfte Version oder aktualisiert auf sie. Eine laufende App wird nicht angefasst
-    /// (`AppRunning`), und es wird vorher nichts geladen. Geladen und installiert wird unter der gemeinsamen Sperre.
-    pub fn install(
-        &self,
-        lineup: &Lineup,
-        app_id: &str,
-        progress: &mut dyn FnMut(u64, Option<u64>),
-    ) -> Result<Outcome, CoreError> {
-        let app = known(app_id)?;
-        let listed = lineup
-            .get(app_id)
-            .ok_or_else(|| CoreError::UnknownApp(app_id.to_string()))?;
-        let _lock = self.lock(app)?;
-        let mut state = State::load(&self.data_dir)?;
-        let loc = self.locate(&state, app_id);
-        let installed = loc.version.clone();
-        let Some(offer) = listed.offer() else {
-            return match (&installed, listed.blocked()) {
-                (_, Some(b)) => Err(CoreError::Blocked {
-                    app: app_id.to_string(),
-                    blocked: b.clone(),
-                }),
-                (Some(v), None) => Ok(Outcome::UpToDate { version: v.clone() }),
-                (None, None) => Err(CoreError::NotOffered(app_id.to_string())),
-            };
-        };
-        let to = offer.entry().version.to_string();
-        if let Some(v) = &installed {
-            if !newer(&to, v) {
-                return Ok(Outcome::UpToDate { version: v.clone() });
-            }
-            if self.is_running(&loc.dir) {
-                return Err(CoreError::AppRunning(app_id.to_string()));
-            }
-        }
-        self.check_launcher_version(offer.entry().min_launcher_version.as_ref())?;
-        let policy = app
-            .policy()
-            .ok_or_else(|| CoreError::PlatformUnsupported(app_id.to_string()))?;
-        let file = self
-            .remote
-            .fetch(
-                &policy,
-                offer,
-                &self.data_dir.join("downloads"),
-                &mut |d, t| progress(d, Some(t)),
-            )
-            .map_err(|blocked| CoreError::Blocked {
-                app: app_id.to_string(),
-                blocked,
-            })?;
-        let dir = loc.dir;
-        let result = self
-            .installer
-            .install(&file, offer.entry().package.kind, &dir);
-        let _ = std::fs::remove_file(&file);
-        result?;
-        state.apps.insert(
-            app_id.to_string(),
-            InstalledApp {
-                version: to.clone(),
-                install_dir: dir,
-            },
-        );
-        state.save(&self.data_dir)?;
-        Ok(match installed {
-            Some(from) => Outcome::Updated { from, to },
-            None => Outcome::Installed { version: to },
-        })
-    }
-
-    pub fn remove(&self, app_id: &str) -> Result<(), CoreError> {
-        let app = known(app_id)?;
-        let _lock = self.lock(app)?;
-        let mut state = State::load(&self.data_dir)?;
-        let loc = self.locate(&state, app_id);
-        if loc.version.is_none() && !state.apps.contains_key(app_id) {
-            return Err(CoreError::NotInstalled(app_id.to_string()));
-        }
-        if !loc.dir.starts_with(self.apps_dir()) {
-            return Err(CoreError::Io(format!(
-                "Der Ordner liegt außerhalb des Programmordners: {}",
-                loc.dir.display()
-            )));
-        }
-        if self.is_running(&loc.dir) {
-            return Err(CoreError::AppRunning(app_id.to_string()));
-        }
-        self.installer.uninstall(&loc.dir)?;
-        state.apps.remove(app_id);
-        state.save(&self.data_dir)
     }
 }

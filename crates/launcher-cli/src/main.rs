@@ -41,6 +41,12 @@ enum Command {
         #[arg(long)]
         no_launch: bool,
     },
+    /// Nur Installationsprobe: lokales Setup ohne Nachweis als App installieren (Merkmal `probe`)
+    #[cfg(feature = "probe")]
+    ProbeInstall { app: String, setup: PathBuf },
+    /// Nur Installationsprobe: lokales Setup ohne Nachweis als Selbst-Update starten (Merkmal `probe`)
+    #[cfg(feature = "probe")]
+    ProbeSelfUpdate { setup: PathBuf },
 }
 
 #[derive(Serialize)]
@@ -95,6 +101,41 @@ fn to_json<T: Serialize + ?Sized>(value: &T) -> String {
 fn run(cli: &Cli) -> Result<String, CoreError> {
     let data_dir = cli.data_dir.clone().unwrap_or_else(default_data_dir);
     let launcher = build_launcher(data_dir, env!("CARGO_PKG_VERSION"));
+    // Befehle ohne Suche: kein Netz (auch in der Installationsprobe).
+    match &cli.command {
+        Command::Launch { app } => {
+            launcher.open(app)?;
+            return Ok(if cli.json {
+                serde_json::json!({ "app": app, "result": "launched" }).to_string()
+            } else {
+                format!("{app} wird gestartet.")
+            });
+        }
+        Command::Remove { app } => {
+            launcher.remove(app)?;
+            return Ok(if cli.json {
+                serde_json::json!({ "app": app, "result": "removed" }).to_string()
+            } else {
+                format!("{app} wurde entfernt.")
+            });
+        }
+        #[cfg(feature = "probe")]
+        Command::ProbeInstall { app, setup } => {
+            let outcome = launcher.install_local(app, setup)?;
+            return Ok(to_json(
+                &[Done {
+                    app: app.clone(),
+                    outcome,
+                }][..],
+            ));
+        }
+        #[cfg(feature = "probe")]
+        Command::ProbeSelfUpdate { setup } => {
+            launcher.self_update_local(setup)?;
+            return Ok(serde_json::json!({ "result": "started" }).to_string());
+        }
+        _ => {}
+    }
     // Suche für alle Apps über die festen Quellen mit GitHub-Nachweis (U3); ohne Netz bleibt sie ohne Angebot.
     let catalog = launcher.load_lineup();
     let mut progress = |_: u64, _: Option<u64>| {};
@@ -164,22 +205,8 @@ fn run(cli: &Cli) -> Result<String, CoreError> {
                 (None, false) => "Der Launcher ist aktuell.".to_string(),
             })
         }
-        Command::Launch { app } => {
-            launcher.open(app)?;
-            Ok(if cli.json {
-                serde_json::json!({ "app": app, "result": "launched" }).to_string()
-            } else {
-                format!("{app} wird gestartet.")
-            })
-        }
-        Command::Remove { app } => {
-            launcher.remove(app)?;
-            Ok(if cli.json {
-                serde_json::json!({ "app": app, "result": "removed" }).to_string()
-            } else {
-                format!("{app} wurde entfernt.")
-            })
-        }
+        // Schon oben ohne Suche behandelt.
+        _ => Ok(String::new()),
     }
 }
 

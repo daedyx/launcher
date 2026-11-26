@@ -1,24 +1,28 @@
 # Daedyx Launcher
 
-Installiert und aktualisiert die Apps der Daedyx-Suite aus einem signierten Katalog. Rust. Windows zuerst, dann macOS.
+Installiert und aktualisiert die Apps der Daedyx-Suite. Rust. Windows zuerst, dann macOS.
 
-**Stand:** Meilenstein L1 (Kern und Kommandozeile) ist fertig, noch ohne Oberfläche. Siehe `docs/STAND.md`.
+Seit 0.2.0 (U3) prüft der Launcher jedes Update mit der gemeinsamen Update-Bibliothek `daedyx-update` (Kern
+`daedyx/core`): Eintrag `entry.json` und GitHub-Nachweis aus dem Release der App, dazu Größe und SHA-256 des Setups.
+Die Quellen stehen fest im Programm (`crates/launcher-core/src/apps.rs`); es gibt keinen Katalog, keinen Schlüssel
+und nichts einzustellen. Siehe `docs/STAND.md`.
 
 ## Ausprobieren
 ```powershell
-cargo test --workspace --features launcher-cli/test-helpers
+cargo test --workspace --all-features
 ```
-Die Tests legen einen Katalog mit Test-Apps an, signieren ihn mit einem Testschlüssel und führen Installation, Update und Entfernen mit der echten Kommandozeile aus.
+Die Tests laufen ohne Netz gegen einen gefälschten Server und eine Attrappe für den Nachweis.
 
-Die Kommandozeile (`daedyx`) braucht einen Katalog (Ordner oder Adresse) und den öffentlichen Schlüssel:
+Die Kommandozeile (`daedyx`):
 
 ```powershell
-daedyx --catalog <Ordner-oder-Adresse> --pubkey <pub.key> list
-daedyx --catalog <...> --pubkey <...> install desk
-daedyx --catalog <...> --pubkey <...> update
-daedyx --catalog <...> --pubkey <...> remove desk
+daedyx list
+daedyx install desk
+daedyx update
+daedyx remove desk
+daedyx self-update --check
 ```
-Mit `--json` kommt die Ausgabe maschinenlesbar.
+Mit `--json` kommt die Ausgabe maschinenlesbar, mit `--data-dir <Ordner>` ein anderer Datenordner.
 
 ## Lizenz
-Noch nicht festgelegt.
+MIT (siehe `LICENSE`), Fremdbestandteile in `THIRD-PARTY-LICENSES.md` (`python scripts/third-party-licenses.py`).

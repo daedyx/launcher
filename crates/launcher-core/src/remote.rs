@@ -1,11 +1,11 @@
 //! Update-Quelle des Launchers (U3): dieselbe Prüfung wie in den Apps (`daedyx-update`, Kern). Je App wird
 //! `entry.json` mit GitHub-Nachweis geholt und geprüft; das Setup lädt erst ein Auftrag (Klick in der Oberfläche oder
 //! Befehl auf der Kommandozeile). Netz und Nachweis-Prüfer sind austauschbar, damit die Tests ohne Netz laufen.
-use crate::net::UreqTransport;
 use crate::sync::lock_or_recover;
 use daedyx_update::attest::{AttestError, GithubAttestation, Provenance};
 use daedyx_update::check::{self, Offer, Outcome};
 use daedyx_update::fetch::Transport;
+use daedyx_update::net::UreqTransport;
 use daedyx_update::policy::UpdatePolicy;
 use daedyx_update::reason::Blocked;
 use daedyx_update::version::Version;

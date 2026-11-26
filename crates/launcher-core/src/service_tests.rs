@@ -63,7 +63,7 @@ fn download_ordner_ist_nach_der_installation_leer() {
     env.publish(&["1.0.0"]);
     let (l, _) = env.launcher();
     install(&l, &env).unwrap();
-    let downloads = env.data_dir.path().join("downloads");
+    let downloads = env.data_dir.path().join("downloads").join("daedyx-desk");
     assert_eq!(std::fs::read_dir(downloads).unwrap().count(), 0);
 }
 
@@ -117,7 +117,7 @@ fn falsche_pruefsumme_startet_den_installer_nicht() {
     assert!(installer.calls.lock().unwrap().is_empty());
     assert!(!env.data_dir.path().join("apps/desk").exists());
     assert_eq!(
-        std::fs::read_dir(env.data_dir.path().join("downloads"))
+        std::fs::read_dir(env.data_dir.path().join("downloads").join("daedyx-desk"))
             .unwrap()
             .count(),
         0
@@ -288,7 +288,7 @@ fn laufende_app_wird_nicht_aktualisiert_und_nichts_geladen() {
     assert!(matches!(install(&l, &env), Err(CoreError::AppRunning(a)) if a == "desk"));
     assert_eq!(installer.calls.lock().unwrap().len(), 1);
     assert_eq!(
-        std::fs::read_dir(env.data_dir.path().join("downloads"))
+        std::fs::read_dir(env.data_dir.path().join("downloads").join("daedyx-desk"))
             .unwrap()
             .count(),
         0
@@ -416,4 +416,29 @@ fn nur_eine_echt_hoehere_version_wird_angeboten() {
         BlockKind::SourceWentBack
     );
     assert!(!l.status(&lineup).unwrap()[0].update_available);
+}
+
+#[cfg(windows)]
+#[test]
+fn das_setup_ist_waehrend_der_installation_gegen_schreiben_gesperrt() {
+    let env = Env::new();
+    env.publish(&["1.0.0"]);
+    let (l, installer) = env.launcher();
+    install(&l, &env).unwrap();
+    assert_eq!(
+        installer.writable.lock().unwrap().as_slice(),
+        [false],
+        "M-U3-1: gesperrter Griff bis zum Ende"
+    );
+}
+
+#[test]
+fn die_app_laedt_in_ihren_eigenen_ordner_und_hinterlaesst_nichts() {
+    let env = Env::new();
+    env.publish(&["1.0.0"]);
+    let (l, _) = env.launcher();
+    install(&l, &env).unwrap();
+    let own = env.data_dir.path().join("downloads").join("daedyx-desk");
+    assert!(own.is_dir(), "eigener Ordner je App (N-U3-1)");
+    assert_eq!(std::fs::read_dir(own).unwrap().count(), 0);
 }

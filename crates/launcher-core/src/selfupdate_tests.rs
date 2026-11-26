@@ -20,9 +20,14 @@ fn lineup(
 }
 
 fn left_in_downloads(env: &Env) -> usize {
-    std::fs::read_dir(env.data_dir.path().join("downloads"))
-        .map(|d| d.count())
-        .unwrap_or(0)
+    std::fs::read_dir(
+        env.data_dir
+            .path()
+            .join("downloads")
+            .join("daedyx-launcher"),
+    )
+    .map(|d| d.count())
+    .unwrap_or(0)
 }
 
 #[test]
@@ -76,7 +81,12 @@ fn the_self_update_loads_verified_and_starts_the_setup_silently() {
     let calls = system.started.lock().unwrap();
     assert_eq!(calls.len(), 1);
     let (program, args) = &calls[0];
-    assert!(program.starts_with(env.data_dir.path().join("downloads")));
+    assert!(program.starts_with(
+        env.data_dir
+            .path()
+            .join("downloads")
+            .join("daedyx-launcher")
+    ));
     assert!(program.ends_with("daedyx-launcher-0.3.0-setup.exe"));
     assert!(program.exists(), "das Setup muss bis zum Start da sein");
     assert_eq!(args, &["/S", "/UPDATE"]);
@@ -150,20 +160,56 @@ fn a_launcher_release_for_a_newer_launcher_is_not_loaded() {
 }
 
 #[test]
-fn leftovers_of_earlier_downloads_are_cleaned_but_not_foreign_files() {
+fn leftovers_are_cleaned_per_app_but_not_foreign_files() {
     let env = Env::new();
     let (l, _, _) = lineup(&env);
     let downloads = env.data_dir.path().join("downloads");
-    std::fs::create_dir_all(&downloads).unwrap();
-    std::fs::write(downloads.join("daedyx-launcher-0.3.0-setup.exe"), b"alt").unwrap();
+    let (me, desk) = (
+        downloads.join("daedyx-launcher"),
+        downloads.join("daedyx-desk"),
+    );
+    std::fs::create_dir_all(&me).unwrap();
+    std::fs::create_dir_all(&desk).unwrap();
+    std::fs::write(me.join("daedyx-launcher-0.3.0-setup.exe"), b"alt").unwrap();
     std::fs::write(
-        downloads.join("daedyx-desk-1.0.0-setup.exe.part"),
+        desk.join("daedyx-desk-1.0.0-setup.exe.part"),
         b"abgebrochen",
     )
     .unwrap();
-    std::fs::write(downloads.join("notiz.txt"), b"fremd").unwrap();
+    std::fs::write(desk.join("notiz.txt"), b"fremd").unwrap();
     l.clean_self_update_leftovers();
-    assert!(!downloads.join("daedyx-launcher-0.3.0-setup.exe").exists());
-    assert!(!downloads.join("daedyx-desk-1.0.0-setup.exe.part").exists());
-    assert!(downloads.join("notiz.txt").exists());
+    assert!(!me.join("daedyx-launcher-0.3.0-setup.exe").exists());
+    assert!(!desk.join("daedyx-desk-1.0.0-setup.exe.part").exists());
+    assert!(desk.join("notiz.txt").exists());
+}
+
+#[test]
+fn a_running_download_of_a_second_launcher_is_never_cleaned() {
+    let env = Env::new();
+    let (l, _, _) = lineup(&env);
+    let desk = env.data_dir.path().join("downloads").join("daedyx-desk");
+    std::fs::create_dir_all(&desk).unwrap();
+    let part = desk.join("daedyx-desk-1.0.0-setup.exe.part");
+    std::fs::write(&part, b"laedt gerade").unwrap();
+    // Ein zweiter Launcher (oder Desk selbst) lädt gerade unter der Sperre der App (Review-Probe N-U3-1).
+    let held = Lock::acquire(&env.lock_dir(), "daedyx-desk").unwrap();
+    l.clean_self_update_leftovers();
+    assert!(part.exists(), "fremder laufender Download bleibt");
+    drop(held);
+    l.clean_self_update_leftovers();
+    assert!(!part.exists());
+}
+
+#[cfg(windows)]
+#[test]
+fn the_setup_is_locked_against_writing_while_it_starts() {
+    let env = Env::new();
+    env.publish_apps(&["1.0.0"], &["0.3.0"], None);
+    let (l, system, c) = lineup(&env);
+    l.start_self_update(&c, true, &mut |_, _| {}).unwrap();
+    assert_eq!(
+        system.writable.lock().unwrap().as_slice(),
+        [false],
+        "M-U3-1"
+    );
 }

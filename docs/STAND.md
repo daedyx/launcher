@@ -3,6 +3,18 @@
 Letzte Änderung: 2026-11-26 (U3: Launcher 0.2.0 „Brücke“ auf der gemeinsamen Update-Bibliothek, Zweig `launcher-u3`)
 
 ## Wo wir stehen
+- **Korrekturrunde U3 (2026-11-26, Review U3, Zweig `launcher-u3`):**
+  - **M-U3-1:** Jedes geladene Setup wird vor dem Start über einen gesperrten Griff noch einmal gehasht und bis zum Ende von Installation bzw. Start festgehalten (`held.rs`, nur Standardbibliothek, wie `daedyx-sys::start_verified`). Damit gilt U-A8 nicht mehr.
+  - **N-U3-1:** Jede App lädt in ihren eigenen Ordner `downloads\<Eintrags-Kennung>`. Aufgeräumt wird je App nur unter ihrer Sperre; bei belegter Sperre bleibt der Ordner unberührt.
+  - **N-U3-3:** README neu, `THIRD-PARTY-LICENSES.md` aus dem Lock neu erzeugt (`scripts/third-party-licenses.py`).
+  - **F-U3-6:** Ein Update löscht `daedyx-catalog.exe`. Außerdem wartet das Setup jetzt auch auf `daedyx.exe`, damit ein Selbst-Update aus der Kommandozeile nicht am Überschreiben scheitert.
+  - **F-U3-9:** `install.rs` ist aus `service.rs` gelöst, `test_server.rs` aus `test_support.rs`.
+  - **F-U3-1:** Das Netz kommt aus dem Kern (`daedyx_update::net`, Merkmal `net`); die Abschrift `net.rs` ist weg.
+  - **F-U3-2:** Neue Installationsprobe `scripts/installer-probe-launcher.ps1`:
+    - Sie arbeitet nur mit Probe-Setups (`build-setup.ps1 -Probe`, Kennung „Daedyx Launcher Probe“, Merkmal `probe`).
+    - Sie prüft das Selbst-Update `/S /UPDATE /NOLAUNCH` und eine App über `/S /D=` und `uninstall.exe`.
+    - Der Weg ohne Nachweis steht nur in `probe_local.rs` (Wächter `probe_guard_tests`).
+  - **Kommandozeile:** `remove` und `launch` suchen nicht mehr im Netz.
 - **U3: Launcher 0.2.0 „Brücke“ prüft mit der gemeinsamen Update-Bibliothek (2026-11-26, Zweig `launcher-u3` ab `paket-sicherheitsrahmen` 861ca2f, nicht in `main`):**
   - **Gelöscht (Entscheid F1):** der eigene Crate `daedyx-update`, also Katalog, Katalog-Bearbeitung und minisign-Prüfung. Dazu gehören das Werkzeug `daedyx-catalog`, der Demo-Katalog, der E2E-Test mit lokalem Katalog sowie die Abnahmeskripte L3/L4.
   - **Neue Grundlage:** Geprüft wird mit dem Kern `daedyx-update` (Tag `daedyx-update-v0.1.0`), also über den GitHub-Nachweis, ohne Schlüssel, Katalogadresse oder Token. Einstellen lässt sich nichts mehr. Die Kommandozeile hat kein `--catalog`/`--pubkey` und kein `config` mehr, die Oberfläche zeigt statt der Eingabefelder einen Hinweis auf die feste Quelle.

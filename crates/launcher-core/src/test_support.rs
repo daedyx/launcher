@@ -4,23 +4,30 @@ use crate::installer::Installer;
 use crate::remote::Remote;
 use crate::service::Launcher;
 use crate::system::{SystemInfo, UninstallEntry};
-use daedyx_update::attest::{AttestError, AttestKind, Provenance};
+use crate::test_server::{sha_hex, Attrappe, Server};
+use daedyx_update::attest::Provenance;
 use daedyx_update::entry::PackageKind;
-use daedyx_update::fetch::{HttpsUrl, Reply, Transport, TransportError};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 /// Attrappe: Das „Paket“ ist ein Text mit der Versionsnummer; die Installation schreibt `app.json`.
 #[derive(Clone, Default)]
 pub(crate) struct TestInstaller {
     pub(crate) calls: Arc<Mutex<Vec<String>>>,
+    /// Je Aufruf: Ließ sich das Setup während der Installation beschreiben? (soll nie, M-U3-1)
+    pub(crate) writable: Arc<Mutex<Vec<bool>>>,
+}
+
+/// Lässt sich die Datei gerade zum Schreiben öffnen?
+pub(crate) fn writable(path: &Path) -> bool {
+    std::fs::OpenOptions::new().write(true).open(path).is_ok()
 }
 
 impl Installer for TestInstaller {
     fn install(&self, package: &Path, _kind: PackageKind, dir: &Path) -> Result<(), CoreError> {
+        self.writable.lock().unwrap().push(writable(package));
         let version = std::fs::read_to_string(package)?;
         std::fs::create_dir_all(dir)?;
         std::fs::write(
@@ -50,6 +57,8 @@ pub(crate) struct FakeSystem {
     pub(crate) running: Arc<Mutex<Vec<PathBuf>>>,
     /// Gestartete Programme (Pfad, Argumente)
     pub(crate) started: Arc<Mutex<Vec<StartedProgram>>>,
+    /// Je Start: Ließ sich das Programm beim Start beschreiben? (soll nie, M-U3-1)
+    pub(crate) writable: Arc<Mutex<Vec<bool>>>,
 }
 
 impl SystemInfo for FakeSystem {
@@ -61,61 +70,13 @@ impl SystemInfo for FakeSystem {
         dirs.iter().map(|d| running.contains(d)).collect()
     }
     fn start_detached(&self, program: &Path, args: &[&str]) -> Result<(), String> {
+        self.writable.lock().unwrap().push(writable(program));
         self.started.lock().unwrap().push((
             program.to_path_buf(),
             args.iter().map(|a| a.to_string()).collect(),
         ));
         Ok(())
     }
-}
-
-/// Gefälschter Server: Adresse zu Inhalt; jede Anfrage wird gezählt.
-#[derive(Clone, Default)]
-pub(crate) struct Server {
-    pub(crate) routes: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
-    pub(crate) requests: Arc<Mutex<Vec<String>>>,
-    pub(crate) offline: Arc<AtomicBool>,
-}
-
-impl Transport for Server {
-    fn get(&mut self, url: &HttpsUrl) -> Result<Reply<'_>, TransportError> {
-        self.requests.lock().unwrap().push(url.as_str().to_string());
-        if self.offline.load(Ordering::SeqCst) {
-            return Err(TransportError::Offline);
-        }
-        Ok(
-            match self.routes.lock().unwrap().get(url.as_str()).cloned() {
-                Some(b) => Reply::Body {
-                    length: Some(b.len() as u64),
-                    reader: Box::new(std::io::Cursor::new(b)),
-                },
-                None => Reply::Status(404),
-            },
-        )
-    }
-}
-
-/// Attrappe für den Nachweis: nimmt alles an, solange `trusted` gilt (die Prüfung selbst testet der Kern).
-struct Attrappe(Arc<AtomicBool>);
-
-impl Provenance for Attrappe {
-    fn verify(&self, _: &[u8; 32], _: &[u8]) -> Result<(), AttestError> {
-        if self.0.load(Ordering::SeqCst) {
-            Ok(())
-        } else {
-            Err(AttestError {
-                kind: AttestKind::Invalid,
-                detail: "test: not trusted".into(),
-            })
-        }
-    }
-}
-
-pub(crate) fn sha_hex(b: &[u8]) -> String {
-    Sha256::digest(b)
-        .iter()
-        .map(|x| format!("{x:02x}"))
-        .collect()
 }
 
 pub(crate) struct Env {
