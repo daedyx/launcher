@@ -1,11 +1,9 @@
 # Mindestzahl bestandener Tests je Testprogramm (cargo xtask testzahl, SICHERHEIT 5.7, Review Prüflücken H-2).
 # Format: <Zahl> <Testprogramm wie im Protokoll von cargo test>. Mehr Tests sind immer erlaubt; die Zahl zu senken
 # oder eine Zeile zu löschen ist eine Lockerung und braucht das Ja des Betreuers (wie eine Ausnahme).
-29 unittests src/lib.rs (daedyx_update)
-81 unittests src/lib.rs (launcher_core)
+72 unittests src/lib.rs (launcher_core)
 79 unittests src/lib.rs (launcher_ui)
-3 unittests src/bin/daedyx_catalog/main.rs (daedyx_catalog)
-1 unittests src/bin/demo_catalog.rs (demo_catalog)
-4 tests/catalog_tool.rs (catalog_tool)
-6 tests/e2e.rs (e2e)
 64 unittests src/main.rs (xtask)
+# U3 (2026-11-26, Zweig launcher-u3): Katalog, Katalog-Werkzeug, Demo-Katalog und E2E mit lokalem Katalog sind gelöscht
+# (Entscheid F1); ihre Zeilen fallen weg, launcher_core 81 -> 72 (Download, Sperre, Quelle prüft jetzt der Kern).
+# Lockerung: Ja des Betreuers ausstehend.

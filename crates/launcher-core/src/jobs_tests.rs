@@ -2,18 +2,18 @@ use crate::error::CoreError;
 use crate::jobs::{percent, Event, Job, Wake, Worker};
 use crate::service::Outcome;
 use crate::test_support::Env;
-use daedyx_update::error::UpdateError;
+use daedyx_update::reason::BlockKind;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-fn start_with(env: &Env, pubkey: &str, wake: Wake) -> Worker {
+fn start_with(env: &Env, wake: Wake) -> Worker {
     let (l, _) = env.launcher();
-    Worker::start(l, pubkey.to_string(), wake)
+    Worker::start(l, wake)
 }
 
 fn start(env: &Env) -> Worker {
-    start_with(env, &env.pubkey, Arc::new(|| {}))
+    start_with(env, Arc::new(|| {}))
 }
 
 fn next(w: &Worker) -> Event {
@@ -24,7 +24,7 @@ fn next(w: &Worker) -> Event {
 fn refreshed(env: &Env) -> Worker {
     let w = start(env);
     w.send(Job::Refresh);
-    assert!(matches!(next(&w), Event::Catalog(Ok(_))));
+    assert!(matches!(next(&w), Event::Lineup(_)));
     assert!(matches!(next(&w), Event::Status(_)));
     w
 }
@@ -47,7 +47,7 @@ fn aktualisieren_meldet_katalog_und_status() {
     let w = start(&env);
     w.send(Job::Refresh);
     match next(&w) {
-        Event::Catalog(Ok(c)) => assert_eq!(c.apps.len(), 1),
+        Event::Lineup(c) => assert_eq!(c.apps.len(), 2),
         other => panic!("{other:?}"),
     }
     match next(&w) {
@@ -87,19 +87,24 @@ fn installieren_meldet_fortschritt_ergebnis_und_status() {
 }
 
 #[test]
-fn fremder_schluessel_meldet_fehler_und_installieren_scheitert_sauber() {
+fn abgelehnter_nachweis_meldet_den_grund_und_installieren_scheitert_sauber() {
     let env = Env::new();
     env.publish(&["1.0.0"]);
-    let other = Env::new();
-    let w = start_with(&env, &other.pubkey, Arc::new(|| {}));
-    w.send(Job::Refresh);
+    env.trusted.store(false, Ordering::SeqCst);
+    let w = start_with(&env, Arc::new(|| {}));
+    w.send(Job::Install("desk".into()));
+    match next(&w) {
+        Event::Lineup(l) => assert_eq!(l.problem(), Some(BlockKind::NotTrusted)),
+        other => panic!("{other:?}"),
+    }
+    assert!(matches!(next(&w), Event::Status(_)));
     assert!(matches!(
         next(&w),
-        Event::Catalog(Err(CoreError::Update(UpdateError::SignatureInvalid)))
+        Event::Installed {
+            result: Err(CoreError::Blocked { .. }),
+            ..
+        }
     ));
-    w.send(Job::Install("desk".into()));
-    assert!(matches!(next(&w), Event::Catalog(Err(_))));
-    assert!(matches!(next(&w), Event::Installed { result: Err(_), .. }));
 }
 
 #[test]
@@ -140,7 +145,6 @@ fn jedes_ereignis_weckt_die_oberflaeche() {
     let c = count.clone();
     let w = start_with(
         &env,
-        &env.pubkey,
         Arc::new(move || {
             c.fetch_add(1, Ordering::SeqCst);
         }),
@@ -162,7 +166,7 @@ fn laeuft_pruefung_meldet_laufende_apps() {
     let env = Env::new();
     env.publish(&["1.0.0"]);
     let (l, _, system) = env.launcher_with_system();
-    let w = Worker::start(l, env.pubkey.clone(), Arc::new(|| {}));
+    let w = Worker::start(l, Arc::new(|| {}));
     w.send(Job::Refresh);
     next(&w);
     next(&w);
@@ -182,16 +186,16 @@ fn laeuft_pruefung_meldet_laufende_apps() {
 #[test]
 fn refresh_meldet_ein_launcher_update_und_selbst_update_startet_das_setup() {
     let env = Env::new();
-    env.publish_apps(&["1.0.0"], &["0.2.0"], None);
+    env.publish_apps(&["1.0.0"], &["0.3.0"], None);
     let (l, _, system) = env.launcher_with_system();
-    let w = Worker::start(l, env.pubkey.clone(), Arc::new(|| {}));
+    let w = Worker::start(l, Arc::new(|| {}));
     w.send(Job::Refresh);
     let update = loop {
         if let Event::SelfUpdate(u) = next(&w) {
             break u;
         }
     };
-    assert_eq!(update.map(|u| u.version), Some("0.2.0".to_string()));
+    assert_eq!(update.map(|u| u.version), Some("0.3.0".to_string()));
     w.send(Job::UpdateSelf);
     loop {
         match next(&w) {
@@ -199,7 +203,7 @@ fn refresh_meldet_ein_launcher_update_und_selbst_update_startet_das_setup() {
             Event::SelfUpdateStarted(result) => {
                 assert_eq!(
                     result.unwrap().map(|u| u.version),
-                    Some("0.2.0".to_string())
+                    Some("0.3.0".to_string())
                 );
                 break;
             }

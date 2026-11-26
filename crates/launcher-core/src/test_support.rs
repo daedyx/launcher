@@ -1,16 +1,17 @@
-//! Gemeinsame Test-Hilfen: Test-Katalog, Test-Installer.
+//! Gemeinsame Test-Hilfen: gefälschter Server ohne Netz, Attrappe für den Nachweis, Test-Installer (U3).
 use crate::error::CoreError;
 use crate::installer::Installer;
+use crate::remote::Remote;
 use crate::service::Launcher;
-use crate::source::Source;
 use crate::system::{SystemInfo, UninstallEntry};
-use daedyx_update::catalog::PackageKind;
-use daedyx_update::verify::sha256_file;
+use daedyx_update::attest::{AttestError, AttestKind, Provenance};
+use daedyx_update::entry::PackageKind;
+use daedyx_update::fetch::{HttpsUrl, Reply, Transport, TransportError};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-
-pub(crate) const PLATFORM: &str = "windows-x64";
 
 /// Attrappe: Das „Paket“ ist ein Text mit der Versionsnummer; die Installation schreibt `app.json`.
 #[derive(Clone, Default)]
@@ -68,21 +69,69 @@ impl SystemInfo for FakeSystem {
     }
 }
 
+/// Gefälschter Server: Adresse zu Inhalt; jede Anfrage wird gezählt.
+#[derive(Clone, Default)]
+pub(crate) struct Server {
+    pub(crate) routes: Arc<Mutex<BTreeMap<String, Vec<u8>>>>,
+    pub(crate) requests: Arc<Mutex<Vec<String>>>,
+    pub(crate) offline: Arc<AtomicBool>,
+}
+
+impl Transport for Server {
+    fn get(&mut self, url: &HttpsUrl) -> Result<Reply<'_>, TransportError> {
+        self.requests.lock().unwrap().push(url.as_str().to_string());
+        if self.offline.load(Ordering::SeqCst) {
+            return Err(TransportError::Offline);
+        }
+        Ok(
+            match self.routes.lock().unwrap().get(url.as_str()).cloned() {
+                Some(b) => Reply::Body {
+                    length: Some(b.len() as u64),
+                    reader: Box::new(std::io::Cursor::new(b)),
+                },
+                None => Reply::Status(404),
+            },
+        )
+    }
+}
+
+/// Attrappe für den Nachweis: nimmt alles an, solange `trusted` gilt (die Prüfung selbst testet der Kern).
+struct Attrappe(Arc<AtomicBool>);
+
+impl Provenance for Attrappe {
+    fn verify(&self, _: &[u8; 32], _: &[u8]) -> Result<(), AttestError> {
+        if self.0.load(Ordering::SeqCst) {
+            Ok(())
+        } else {
+            Err(AttestError {
+                kind: AttestKind::Invalid,
+                detail: "test: not trusted".into(),
+            })
+        }
+    }
+}
+
+pub(crate) fn sha_hex(b: &[u8]) -> String {
+    Sha256::digest(b)
+        .iter()
+        .map(|x| format!("{x:02x}"))
+        .collect()
+}
+
 pub(crate) struct Env {
-    pub(crate) catalog_dir: tempfile::TempDir,
+    pub(crate) server: Server,
+    pub(crate) trusted: Arc<AtomicBool>,
     pub(crate) data_dir: tempfile::TempDir,
-    pub(crate) pubkey: String,
-    pub(crate) keypair: minisign::KeyPair,
+    pub(crate) local_dir: tempfile::TempDir,
 }
 
 impl Env {
     pub(crate) fn new() -> Env {
-        let keypair = minisign::KeyPair::generate_unencrypted_keypair().unwrap();
         Env {
-            catalog_dir: tempfile::tempdir().unwrap(),
+            server: Server::default(),
+            trusted: Arc::new(AtomicBool::new(true)),
             data_dir: tempfile::tempdir().unwrap(),
-            pubkey: keypair.pk.to_box().unwrap().to_string(),
-            keypair,
+            local_dir: tempfile::tempdir().unwrap(),
         }
     }
 
@@ -90,67 +139,68 @@ impl Env {
         self.publish_with(versions, None);
     }
 
-    /// Veröffentlicht die Versionen und signiert den Katalog. `wrong_sha`: für diese Version
-    /// wird absichtlich eine falsche Prüfsumme eingetragen (der Katalog bleibt gültig signiert).
+    /// Veröffentlicht die höchste der Versionen von `desk`. `wrong_sha`: für diese Version steht im (geprüften)
+    /// Eintrag absichtlich eine falsche Prüfsumme.
     pub(crate) fn publish_with(&self, versions: &[&str], wrong_sha: Option<&str>) {
         self.publish_apps(versions, &[], wrong_sha);
     }
 
-    /// Veröffentlicht Versionen von `desk` und (falls angegeben) der App `launcher` und signiert den
-    /// Katalog. `wrong_sha`: für diese Version von `desk` wird eine falsche Prüfsumme eingetragen.
+    /// Veröffentlicht je App die höchste Version als „latest“ (`entry.json`, Bündel, Setup). Das Setup ist ein Text
+    /// mit der Versionsnummer.
     pub(crate) fn publish_apps(&self, desk: &[&str], launcher: &[&str], wrong_sha: Option<&str>) {
-        std::fs::create_dir_all(self.catalog_dir.path().join("packages")).unwrap();
-        let mut apps = Vec::new();
-        for (id, name, versions, key) in [
-            (
-                "desk",
-                "Daedyx Desk",
-                desk,
-                r#""registryKey":"Daedyx Desk","#,
-            ),
-            ("launcher", "Daedyx Launcher", launcher, ""),
+        for (app, versions) in [
+            (crate::apps::find("desk").unwrap(), desk),
+            (&crate::apps::LAUNCHER, launcher),
         ] {
-            if versions.is_empty() {
+            let Some(v) = versions
+                .iter()
+                .max_by_key(|v| daedyx_update::version::parse(v).unwrap())
+            else {
                 continue;
-            }
-            let mut releases = Vec::new();
-            for v in versions {
-                let rel = format!("packages/{id}-{v}.exe");
-                let path = self.catalog_dir.path().join(&rel);
-                std::fs::write(&path, v.as_bytes()).unwrap();
-                let sha = if id == "desk" && wrong_sha == Some(*v) {
-                    "00".repeat(32)
-                } else {
-                    sha256_file(&path).unwrap()
-                };
-                releases.push(format!(
-                    r#"{{"version":"{v}","date":"2026-11-13","packages":{{"{PLATFORM}":{{"url":"{rel}","sha256":"{sha}","size":{},"kind":"nsis-silent"}}}}}}"#,
-                    v.len()
-                ));
-            }
-            apps.push(format!(
-                r#"{{"id":"{id}","name":"{name}",{key}"releases":[{}]}}"#,
-                releases.join(",")
-            ));
+            };
+            self.release(app, v, wrong_sha == Some(*v), None);
         }
-        let json = format!(
-            r#"{{"schema":1,"minLauncherVersion":"0.1.0","apps":[{}]}}"#,
-            apps.join(",")
+    }
+
+    /// Ein Release einer App als „latest“; `min_launcher`: Feld `minLauncherVersion`.
+    pub(crate) fn release(
+        &self,
+        app: &crate::apps::KnownApp,
+        v: &str,
+        wrong_sha: bool,
+        min_launcher: Option<&str>,
+    ) {
+        let p = app.policy().unwrap();
+        let url = format!(
+            "https://github.com/daedyx/{}/releases/download/v{v}/{}-{v}-setup.exe",
+            app.repo, app.update_app
         );
-        std::fs::write(self.catalog_dir.path().join("catalog.json"), &json).unwrap();
-        let sig = minisign::sign(
-            Some(&self.keypair.pk),
-            &self.keypair.sk,
-            std::io::Cursor::new(json.as_bytes()),
-            Some("trusted"),
-            Some("untrusted"),
-        )
-        .unwrap();
-        std::fs::write(
-            self.catalog_dir.path().join("catalog.json.minisig"),
-            sig.to_string(),
-        )
-        .unwrap();
+        let sha = if wrong_sha {
+            "00".repeat(32)
+        } else {
+            sha_hex(v.as_bytes())
+        };
+        let mut entry = serde_json::json!({
+            "schema": 1, "app": app.update_app, "version": v, "date": "2026-11-13", "notes": format!("Neu in {v}."),
+            "packages": {(p.platform().key()): {"url": url, "sha256": sha, "size": v.len(), "kind": "nsis-silent"}}
+        });
+        if let Some(m) = min_launcher {
+            entry["minLauncherVersion"] = serde_json::json!(m);
+        }
+        let mut routes = self.server.routes.lock().unwrap();
+        routes.insert(
+            p.latest_asset_url("entry.json"),
+            serde_json::to_vec(&entry).unwrap(),
+        );
+        routes.insert(
+            p.latest_asset_url("provenance.sigstore.json"),
+            b"{}".to_vec(),
+        );
+        routes.insert(url, v.as_bytes().to_vec());
+    }
+
+    pub(crate) fn lock_dir(&self) -> PathBuf {
+        daedyx_update::lock::shared_lock_dir(self.local_dir.path())
     }
 
     pub(crate) fn launcher(&self) -> (Launcher, TestInstaller) {
@@ -161,11 +211,16 @@ impl Env {
     pub(crate) fn launcher_with_system(&self) -> (Launcher, TestInstaller, FakeSystem) {
         let installer = TestInstaller::default();
         let system = FakeSystem::default();
+        let trusted = Arc::clone(&self.trusted);
+        let remote = Remote::new(
+            Box::new(self.server.clone()),
+            Box::new(move |_| Ok(Box::new(Attrappe(Arc::clone(&trusted))) as Box<dyn Provenance>)),
+        );
         let launcher = Launcher::new(
-            Source::Dir(self.catalog_dir.path().to_path_buf()),
-            PLATFORM.into(),
+            remote,
             self.data_dir.path().to_path_buf(),
-            "0.1.0".into(),
+            self.lock_dir(),
+            "0.2.0".into(),
             Box::new(installer.clone()),
             Box::new(system.clone()),
         );

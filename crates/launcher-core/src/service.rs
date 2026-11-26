@@ -1,28 +1,25 @@
-use crate::download::download_verified;
+//! Dienste des Launchers: Stand der Apps, Installieren, Aktualisieren, Entfernen. Seit U3 über die Update-Bibliothek
+//! `daedyx-update` (GitHub-Nachweis statt signiertem Katalog) und mit derselben Sperre wie die Apps.
+use crate::apps::{self, KnownApp};
 use crate::error::CoreError;
 use crate::installer::Installer;
-use crate::lock::Lock;
-use crate::source::Source;
+use crate::lineup::Lineup;
+use crate::remote::Remote;
 use crate::state::{InstalledApp, State};
 use crate::system::SystemInfo;
-use daedyx_update::catalog::{is_valid_app_id, Catalog};
-use daedyx_update::error::UpdateError;
-use daedyx_update::verify::verified_catalog;
-use daedyx_update::version::is_newer;
+use daedyx_update::lock::{Lock, LockError};
+use daedyx_update::version::{self, Version};
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
 pub struct Launcher {
-    pub source: Source,
-    pub platform: String,
+    pub remote: Remote,
     pub data_dir: PathBuf,
+    /// Gemeinsamer Sperrordner mit den Apps (`<lokal>\daedyx\locks`, `daedyx_update::lock::shared_lock_dir`).
+    pub lock_dir: PathBuf,
     pub launcher_version: String,
     pub installer: Box<dyn Installer>,
     pub system: Box<dyn SystemInfo>,
-    /// Registry-Namen der Apps aus dem zuletzt geprüften Katalog (App-Kennung zu Schlüsselname).
-    pub(crate) registry_keys: Mutex<BTreeMap<String, String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -43,23 +40,37 @@ pub enum Outcome {
     UpToDate { version: String },
 }
 
+/// `candidate` ist echt höher als `installed` (ungültige Angaben: nein).
+pub(crate) fn newer(candidate: &str, installed: &str) -> bool {
+    match (version::parse(candidate), version::parse(installed)) {
+        (Ok(c), Ok(i)) => version::is_newer(&c, &i),
+        _ => false,
+    }
+}
+
+fn known(app_id: &str) -> Result<&'static KnownApp, CoreError> {
+    apps::APPS
+        .iter()
+        .find(|a| a.id == app_id)
+        .ok_or_else(|| CoreError::UnknownApp(app_id.to_string()))
+}
+
 impl Launcher {
     pub fn new(
-        source: Source,
-        platform: String,
+        remote: Remote,
         data_dir: PathBuf,
+        lock_dir: PathBuf,
         launcher_version: String,
         installer: Box<dyn Installer>,
         system: Box<dyn SystemInfo>,
     ) -> Launcher {
         Launcher {
-            source,
-            platform,
+            remote,
             data_dir,
+            lock_dir,
             launcher_version,
             installer,
             system,
-            registry_keys: Mutex::new(BTreeMap::new()),
         }
     }
 
@@ -75,44 +86,40 @@ impl Launcher {
             .unwrap_or(false)
     }
 
-    /// Katalog und Signatur holen, die Signatur prüfen, erst dann den Katalog lesen.
-    pub fn load_catalog(&self, pubkey_text: &str) -> Result<Catalog, CoreError> {
-        let bytes = self.source.fetch_bytes("catalog.json")?;
-        let sig = String::from_utf8(self.source.fetch_bytes("catalog.json.minisig")?)
-            .map_err(|_| UpdateError::SignatureInvalid)?;
-        let catalog = verified_catalog(pubkey_text, &bytes, &sig)?;
-        catalog.check_launcher(&self.launcher_version)?;
-        let mut keys = crate::sync::lock_or_recover(&self.registry_keys);
-        keys.clear();
-        for app in &catalog.apps {
-            if let Some(k) = &app.registry_key {
-                keys.insert(app.id.clone(), k.clone());
-            }
-        }
-        Ok(catalog)
+    /// Die gemeinsame Sperre einer App: dieselbe, die die App bei ihrem eigenen Update holt.
+    pub(crate) fn lock(&self, app: &KnownApp) -> Result<Lock, CoreError> {
+        Lock::acquire(&self.lock_dir, app.update_app).map_err(|e| match e {
+            LockError::Busy => CoreError::Busy(app.id.to_string()),
+            other => CoreError::Io(other.to_string()),
+        })
     }
 
-    pub fn status(&self, catalog: &Catalog) -> Result<Vec<AppStatus>, CoreError> {
+    /// Verlangt ein Eintrag eine neuere Launcher-Version (`minLauncherVersion`), wird nichts geladen.
+    pub(crate) fn check_launcher_version(&self, need: Option<&Version>) -> Result<(), CoreError> {
+        let have = version::parse(&self.launcher_version).unwrap_or(Version::new(0, 0, 0));
+        match need {
+            Some(n) if have < *n => Err(CoreError::LauncherTooOld {
+                need: n.to_string(),
+                have: self.launcher_version.clone(),
+            }),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn status(&self, lineup: &Lineup) -> Result<Vec<AppStatus>, CoreError> {
         let mut state = State::load(&self.data_dir)?;
         let mut adopted = false;
         let mut found = Vec::new();
-        let apps: Vec<&daedyx_update::catalog::App> = catalog
-            .apps
-            .iter()
-            .filter(|a| a.id != crate::selfupdate::LAUNCHER_APP_ID)
-            .collect();
-        for app in &apps {
-            let loc = self.locate(&state, &app.id);
+        for listed in &lineup.apps {
+            let loc = self.locate(&state, listed.app.id);
             if let Some(version) = &loc.version {
                 // Eine gefundene Installation (auch von Hand gemacht) wird gemerkt.
-                if state.apps.get(&app.id).map(|a| &a.install_dir) != Some(&loc.dir) {
-                    state.apps.insert(
-                        app.id.clone(),
-                        InstalledApp {
-                            version: version.clone(),
-                            install_dir: loc.dir.clone(),
-                        },
-                    );
+                if state.apps.get(listed.app.id).map(|a| &a.install_dir) != Some(&loc.dir) {
+                    let app = InstalledApp {
+                        version: version.clone(),
+                        install_dir: loc.dir.clone(),
+                    };
+                    state.apps.insert(listed.app.id.to_string(), app);
                     adopted = true;
                 }
             }
@@ -124,16 +131,16 @@ impl Launcher {
         let dirs: Vec<PathBuf> = found.iter().map(|l| l.dir.clone()).collect();
         let running = self.system.running(&dirs);
         let mut out = Vec::new();
-        for (i, app) in apps.iter().enumerate() {
+        for (i, listed) in lineup.apps.iter().enumerate() {
             let installed = found.get(i).and_then(|l| l.version.clone());
-            let latest = app.latest()?.map(|r| r.version.clone());
+            let latest = listed.latest_version();
             let update_available = match (&installed, &latest) {
-                (Some(i), Some(l)) => is_newer(l, i)?,
+                (Some(i), Some(l)) => newer(l, i),
                 _ => false,
             };
             out.push(AppStatus {
-                id: app.id.clone(),
-                name: app.name.clone(),
+                id: listed.app.id.to_string(),
+                name: listed.app.name.to_string(),
                 running: installed.is_some() && running.get(i).copied().unwrap_or(false),
                 installed,
                 latest,
@@ -144,15 +151,13 @@ impl Launcher {
     }
 
     /// Kennungen der installierten Apps, die gerade laufen.
-    pub fn running_apps(&self, catalog: &Catalog) -> Result<Vec<String>, CoreError> {
+    pub fn running_apps(&self) -> Result<Vec<String>, CoreError> {
         let state = State::load(&self.data_dir)?;
-        let installed: Vec<(String, PathBuf)> = catalog
-            .apps
+        let installed: Vec<(String, PathBuf)> = apps::APPS
             .iter()
-            .filter(|a| a.id != crate::selfupdate::LAUNCHER_APP_ID)
             .filter_map(|a| {
-                let loc = self.locate(&state, &a.id);
-                loc.version.map(|_| (a.id.clone(), loc.dir))
+                let loc = self.locate(&state, a.id);
+                loc.version.map(|_| (a.id.to_string(), loc.dir))
             })
             .collect();
         let dirs: Vec<PathBuf> = installed.iter().map(|(_, d)| d.clone()).collect();
@@ -165,76 +170,80 @@ impl Launcher {
             .collect())
     }
 
-    /// Installiert die neueste Version oder aktualisiert auf sie. Eine laufende App wird nicht
-    /// angefasst (`AppRunning`), und es wird vorher nichts geladen.
+    /// Installiert die neueste geprüfte Version oder aktualisiert auf sie. Eine laufende App wird nicht angefasst
+    /// (`AppRunning`), und es wird vorher nichts geladen. Geladen und installiert wird unter der gemeinsamen Sperre.
     pub fn install(
         &self,
-        catalog: &Catalog,
+        lineup: &Lineup,
         app_id: &str,
         progress: &mut dyn FnMut(u64, Option<u64>),
     ) -> Result<Outcome, CoreError> {
-        let app = catalog.app(app_id)?;
-        let release = app.latest()?.ok_or_else(|| UpdateError::NoPackage {
-            app: app_id.to_string(),
-            platform: self.platform.clone(),
-        })?;
-        let package = release.package_for(app_id, &self.platform)?;
-
-        let _lock = Lock::acquire(&self.data_dir.join("locks"), app_id)?;
+        let app = known(app_id)?;
+        let listed = lineup
+            .get(app_id)
+            .ok_or_else(|| CoreError::UnknownApp(app_id.to_string()))?;
+        let _lock = self.lock(app)?;
         let mut state = State::load(&self.data_dir)?;
         let loc = self.locate(&state, app_id);
         let installed = loc.version.clone();
+        let Some(offer) = listed.offer() else {
+            return match (&installed, listed.blocked()) {
+                (_, Some(b)) => Err(CoreError::Blocked {
+                    app: app_id.to_string(),
+                    blocked: b.clone(),
+                }),
+                (Some(v), None) => Ok(Outcome::UpToDate { version: v.clone() }),
+                (None, None) => Err(CoreError::NotOffered(app_id.to_string())),
+            };
+        };
+        let to = offer.entry().version.to_string();
         if let Some(v) = &installed {
-            if !is_newer(&release.version, v)? {
+            if !newer(&to, v) {
                 return Ok(Outcome::UpToDate { version: v.clone() });
             }
             if self.is_running(&loc.dir) {
                 return Err(CoreError::AppRunning(app_id.to_string()));
             }
         }
-
-        let file_name = format!(
-            "{}-{}.{}",
-            app_id,
-            release.version,
-            package.kind.file_extension()
-        );
-        let file = download_verified(
-            &self.source,
-            package,
-            &self.data_dir.join("downloads"),
-            &file_name,
-            progress,
-        )?;
+        self.check_launcher_version(offer.entry().min_launcher_version.as_ref())?;
+        let policy = app
+            .policy()
+            .ok_or_else(|| CoreError::PlatformUnsupported(app_id.to_string()))?;
+        let file = self
+            .remote
+            .fetch(
+                &policy,
+                offer,
+                &self.data_dir.join("downloads"),
+                &mut |d, t| progress(d, Some(t)),
+            )
+            .map_err(|blocked| CoreError::Blocked {
+                app: app_id.to_string(),
+                blocked,
+            })?;
         let dir = loc.dir;
-        let result = self.installer.install(&file, package.kind, &dir);
+        let result = self
+            .installer
+            .install(&file, offer.entry().package.kind, &dir);
         let _ = std::fs::remove_file(&file);
         result?;
-
         state.apps.insert(
             app_id.to_string(),
             InstalledApp {
-                version: release.version.clone(),
+                version: to.clone(),
                 install_dir: dir,
             },
         );
         state.save(&self.data_dir)?;
         Ok(match installed {
-            Some(from) => Outcome::Updated {
-                from,
-                to: release.version.clone(),
-            },
-            None => Outcome::Installed {
-                version: release.version.clone(),
-            },
+            Some(from) => Outcome::Updated { from, to },
+            None => Outcome::Installed { version: to },
         })
     }
 
     pub fn remove(&self, app_id: &str) -> Result<(), CoreError> {
-        if !is_valid_app_id(app_id) {
-            return Err(UpdateError::UnknownApp(app_id.to_string()).into());
-        }
-        let _lock = Lock::acquire(&self.data_dir.join("locks"), app_id)?;
+        let app = known(app_id)?;
+        let _lock = self.lock(app)?;
         let mut state = State::load(&self.data_dir)?;
         let loc = self.locate(&state, app_id);
         if loc.version.is_none() && !state.apps.contains_key(app_id) {

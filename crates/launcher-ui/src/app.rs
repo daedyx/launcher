@@ -4,7 +4,7 @@ use crate::i18n::Texts;
 use crate::model::{Busy, Load, Model};
 use crate::section_view::View;
 use crate::settings::UiSettings;
-use crate::settings_view::{AppInfo, ConfigEdit};
+use crate::settings_view::AppInfo;
 use crate::shell::{self, Page};
 use eframe::egui;
 use launcher_core::jobs::{Job, Worker};
@@ -12,10 +12,10 @@ use std::time::{Duration, Instant};
 
 /// So oft wird nachgesehen, ob eine App läuft.
 const RUNNING_POLL: Duration = Duration::from_secs(3);
-/// So oft wird der Katalog neu geprüft, solange der Launcher offen bleibt.
+/// So oft wird neu nach Updates gesucht, solange der Launcher offen bleibt.
 const REFRESH_EVERY: Duration = Duration::from_secs(6 * 3600);
 
-/// Ist die regelmäßige Katalogprüfung fällig? Nur wenn gerade nichts installiert wird.
+/// Ist die regelmäßige Suche fällig? Nur wenn gerade nichts installiert wird.
 pub fn refresh_due(since_last: Duration, idle: bool) -> bool {
     idle && since_last >= REFRESH_EVERY
 }
@@ -33,8 +33,6 @@ pub struct LauncherApp {
     auto_tried: bool,
     pub(crate) self_update_requested: bool,
     pub(crate) autostart: crate::autostart::Autostart,
-    pub(crate) config_edit: ConfigEdit,
-    pub(crate) rebuild: Option<crate::app_settings::Rebuild>,
     pub(crate) query: String,
     pub(crate) sort: Sort,
     pub(crate) view: View,
@@ -44,7 +42,7 @@ pub struct LauncherApp {
 }
 
 impl LauncherApp {
-    /// `worker` ist `Err(Text)`, wenn der Start nicht möglich war (zum Beispiel fehlende Katalogquelle).
+    /// `worker` ist `Err(Text)`, wenn der Start nicht möglich war (die Oberfläche zeigt dann nur den Text).
     pub fn new(t: Texts, worker: Result<Worker, String>) -> LauncherApp {
         let mut model = Model::new();
         let worker = match worker {
@@ -68,8 +66,6 @@ impl LauncherApp {
             auto_tried: false,
             self_update_requested: false,
             autostart: crate::autostart::Autostart::default(),
-            config_edit: ConfigEdit::default(),
-            rebuild: None,
             query: String::new(),
             sort: Sort::default(),
             view: View::default(),

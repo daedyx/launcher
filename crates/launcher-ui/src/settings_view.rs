@@ -10,22 +10,12 @@ pub struct AppInfo {
     pub data_dir: PathBuf,
 }
 
-/// Eingabefelder für Katalogquelle und Schlüsseldatei samt Rückmeldung des letzten Speicherns.
-#[derive(Debug, Clone, Default)]
-pub struct ConfigEdit {
-    pub catalog: String,
-    pub pubkey: String,
-    /// `Ok(Hinweis)` oder `Err(Fehlertext)` des letzten Versuchs
-    pub message: Option<Result<String, String>>,
-}
-
 #[derive(Debug, Default, PartialEq)]
 pub struct Outcome {
     pub theme_changed: bool,
     pub language_changed: bool,
     pub updates_changed: bool,
     pub autostart_changed: bool,
-    pub config_save: bool,
     pub quit: bool,
 }
 
@@ -94,13 +84,7 @@ fn segmented<T: Copy + PartialEq>(ui: &mut egui::Ui, current: &mut T, options: V
 
 /// Inhalt der Einstellungsseite (die Überschrift zeichnet der Rahmen). Gibt zurück, was sich
 /// ergeben hat.
-pub fn show(
-    ui: &mut egui::Ui,
-    t: &Texts,
-    info: &AppInfo,
-    settings: &mut UiSettings,
-    edit: &mut ConfigEdit,
-) -> Outcome {
+pub fn show(ui: &mut egui::Ui, t: &Texts, info: &AppInfo, settings: &mut UiSettings) -> Outcome {
     let mut out = Outcome::default();
     let p = Palette::current(ui);
     egui::ScrollArea::vertical()
@@ -144,44 +128,10 @@ pub fn show(
                         .checkbox(&mut settings.autostart, t.t("settings.autostart"))
                         .changed();
                 });
-                boxed(right, t.t("settings.box_catalog"), |ui| {
-                    heading(ui, t.t("settings.catalog"));
-                    ui.add(
-                        egui::TextEdit::singleline(&mut edit.catalog)
-                            .hint_text(launcher_core::config::DEFAULT_CATALOG_URL)
-                            .desired_width(f32::INFINITY),
-                    );
-                    ui.add_space(8.0);
-                    heading(ui, t.t("settings.pubkey"));
-                    ui.add(
-                        egui::TextEdit::singleline(&mut edit.pubkey)
-                            .hint_text(t.t("settings.pubkey_hint"))
-                            .desired_width(f32::INFINITY),
-                    );
-                    ui.add_space(8.0);
-                    // Untereinander: nebeneinander reicht die Spaltenbreite nicht, die Box würde über den Fensterrand wachsen
-                    ui.vertical(|ui| {
-                        if outlined_button(ui, t.t("settings.apply")) {
-                            out.config_save = true;
-                        }
-                        if outlined_button(ui, t.t("settings.reset")) {
-                            edit.catalog.clear();
-                            edit.pubkey.clear();
-                            out.config_save = true;
-                        }
-                    });
-                    match &edit.message {
-                        Some(Ok(text)) => {
-                            ui.label(RichText::new(text).color(p.green_text));
-                        }
-                        Some(Err(text)) => {
-                            ui.label(RichText::new(text).color(p.danger_text));
-                        }
-                        None => {}
-                    }
-                    ui.add_space(4.0);
+                // Update-Quelle (U3): fest im Programm, nichts einzustellen; nur der Hinweis, woher Updates kommen.
+                boxed(right, t.t("settings.box_source"), |ui| {
                     ui.label(
-                        RichText::new(t.t("settings.hint"))
+                        RichText::new(t.t("settings.source_hint"))
                             .size(12.0)
                             .color(p.text2),
                     );

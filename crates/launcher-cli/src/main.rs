@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use launcher_core::config::{build_launcher, Config};
+use launcher_core::config::build_launcher;
 use launcher_core::error::CoreError;
 use launcher_core::paths::default_data_dir;
 use launcher_core::service::{AppStatus, Outcome};
@@ -10,12 +10,6 @@ use std::process::ExitCode;
 #[derive(Parser)]
 #[command(name = "daedyx", version, about = "Daedyx Launcher (Kommandozeile)")]
 struct Cli {
-    /// Katalogquelle: Ordner oder Internetadresse (sonst aus der gespeicherten Einstellung)
-    #[arg(long, env = "DAEDYX_CATALOG")]
-    catalog: Option<String>,
-    /// Öffentlicher minisign-Schlüssel des Katalogs (Datei; sonst aus der gespeicherten Einstellung)
-    #[arg(long, env = "DAEDYX_PUBKEY")]
-    pubkey: Option<PathBuf>,
     /// Datenordner des Launchers
     #[arg(long, env = "DAEDYX_DATA_DIR")]
     data_dir: Option<PathBuf>,
@@ -46,24 +40,6 @@ enum Command {
         /// Das Setup startet den Launcher danach nicht neu (für Skripte und Tests)
         #[arg(long)]
         no_launch: bool,
-    },
-    /// Gespeicherte Einstellungen (Katalogquelle, Schlüsseldatei) anzeigen oder ändern
-    Config {
-        #[command(subcommand)]
-        action: ConfigAction,
-    },
-}
-
-#[derive(Subcommand)]
-enum ConfigAction {
-    /// Gespeicherte Einstellungen anzeigen
-    Show,
-    /// Einstellungen prüfen und dauerhaft speichern
-    Set {
-        #[arg(long)]
-        catalog: Option<String>,
-        #[arg(long)]
-        pubkey: Option<PathBuf>,
     },
 }
 
@@ -116,49 +92,11 @@ fn to_json<T: Serialize + ?Sized>(value: &T) -> String {
     serde_json::to_string(value).unwrap_or_else(|_| "null".into())
 }
 
-fn config_command(
-    cli: &Cli,
-    data_dir: PathBuf,
-    action: &ConfigAction,
-) -> Result<String, CoreError> {
-    let saved = Config::load(&data_dir);
-    match action {
-        ConfigAction::Show => Ok(if cli.json {
-            to_json(&saved)
-        } else {
-            format!(
-                "Katalogquelle: {}\nSchlüsseldatei: {}\nDatenordner: {}",
-                saved.catalog.as_deref().unwrap_or("-"),
-                saved
-                    .pubkey
-                    .as_ref()
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "-".into()),
-                data_dir.display()
-            )
-        }),
-        ConfigAction::Set { catalog, pubkey } => {
-            let new = saved.with_overrides(catalog.clone(), pubkey.clone());
-            // Erst prüfen (Quelle erlaubt, Ordner da, Schlüssel gültig), dann speichern.
-            build_launcher(&new, data_dir.clone(), env!("CARGO_PKG_VERSION"))?;
-            new.save(&data_dir)?;
-            Ok(if cli.json {
-                to_json(&new)
-            } else {
-                "Einstellungen gespeichert.".to_string()
-            })
-        }
-    }
-}
-
 fn run(cli: &Cli) -> Result<String, CoreError> {
     let data_dir = cli.data_dir.clone().unwrap_or_else(default_data_dir);
-    if let Command::Config { action } = &cli.command {
-        return config_command(cli, data_dir, action);
-    }
-    let config = Config::load(&data_dir).with_overrides(cli.catalog.clone(), cli.pubkey.clone());
-    let (launcher, pubkey) = build_launcher(&config, data_dir, env!("CARGO_PKG_VERSION"))?;
-    let catalog = launcher.load_catalog(&pubkey)?;
+    let launcher = build_launcher(data_dir, env!("CARGO_PKG_VERSION"));
+    // Suche für alle Apps über die festen Quellen mit GitHub-Nachweis (U3); ohne Netz bleibt sie ohne Angebot.
+    let catalog = launcher.load_lineup();
     let mut progress = |_: u64, _: Option<u64>| {};
 
     match &cli.command {
@@ -209,14 +147,8 @@ fn run(cli: &Cli) -> Result<String, CoreError> {
                 done_text(&done)
             })
         }
-        // Wird schon vor dem Laden des Katalogs behandelt; hier nur der Vollständigkeit halber.
-        Command::Config { action } => config_command(
-            cli,
-            cli.data_dir.clone().unwrap_or_else(default_data_dir),
-            action,
-        ),
         Command::SelfUpdate { check, no_launch } => {
-            let available = launcher.self_update_available(&catalog)?;
+            let available = launcher.self_update_available(&catalog);
             let update = if *check {
                 available
             } else {

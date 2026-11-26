@@ -12,14 +12,8 @@ fn datum_wird_deutsch_geschrieben() {
 #[test]
 fn pruefzeit_zeigt_gerade_eben_und_minuten() {
     let t = Texts::de();
-    assert_eq!(
-        checked_text(&t, 0),
-        "Katalog-Signatur geprüft · gerade eben"
-    );
-    assert_eq!(
-        checked_text(&t, 11),
-        "Katalog-Signatur geprüft · vor 11 Min."
-    );
+    assert_eq!(checked_text(&t, 0), "Nachweise geprüft · gerade eben");
+    assert_eq!(checked_text(&t, 11), "Nachweise geprüft · vor 11 Min.");
 }
 
 fn card(state: CardState) -> Card {

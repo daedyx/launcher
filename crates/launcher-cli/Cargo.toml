@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "launcher-cli"
 version.workspace = true
 edition.workspace = true
@@ -15,23 +15,11 @@ name = "fake-installer"
 path = "src/bin/fake_installer.rs"
 required-features = ["test-helpers"]
 
-[[bin]]
-name = "daedyx-catalog"
-path = "src/bin/daedyx_catalog/main.rs"
-
-[[bin]]
-name = "demo-catalog"
-path = "src/bin/demo_catalog.rs"
-required-features = ["test-helpers"]
-
 [features]
 test-helpers = []
 
 [dependencies]
-minisign.workspace = true
-rpassword.workspace = true
 launcher-core = { path = "../launcher-core" }
-daedyx-update = { path = "../daedyx-update" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

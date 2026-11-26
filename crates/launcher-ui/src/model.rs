@@ -1,11 +1,15 @@
 use crate::errors::error_message;
 use crate::i18n::Texts;
-use daedyx_update::catalog::Catalog;
+use launcher_core::daedyx_update::reason::BlockKind;
 use launcher_core::jobs::Event;
+use launcher_core::lineup::Lineup;
 use launcher_core::selfupdate::{SelfUpdate, LAUNCHER_APP_ID};
 use launcher_core::service::{AppStatus, Outcome};
 use std::collections::BTreeMap;
 use std::time::Instant;
+
+/// Lizenz aller Daedyx-Apps.
+const LICENSE: &str = "MIT";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CardState {
@@ -22,7 +26,7 @@ pub struct Card {
     pub installed: Option<String>,
     pub latest: Option<String>,
     pub state: CardState,
-    /// Veröffentlichungsdatum der neuesten Version (aus dem signierten Katalog).
+    /// Veröffentlichungsdatum der neuesten geprüften Version (aus dem Eintrag mit GitHub-Nachweis).
     pub date: Option<String>,
     pub license: String,
     pub author: String,
@@ -55,13 +59,14 @@ pub struct Model {
     pub cards: Vec<Card>,
     pub busy: BTreeMap<String, Busy>,
     pub notice: Option<Notice>,
-    /// Neuere Version des Launchers selbst im Katalog
+    /// Geprüfte neuere Version des Launchers selbst
     pub self_update: Option<SelfUpdate>,
     /// Fortschritt (0 bis 1) des Downloads des Launcher-Setups
     pub self_progress: Option<f32>,
     /// Das Setup läuft: der Launcher soll sich beenden
     pub quit_requested: bool,
-    catalog: Option<Catalog>,
+    /// Letztes Suchergebnis und die Beschreibungen der Apps in der Sprache der Oberfläche.
+    lineup: Option<(Lineup, Vec<(String, String)>)>,
     checked_at: Option<Instant>,
 }
 
@@ -81,7 +86,7 @@ impl Model {
             self_update: None,
             self_progress: None,
             quit_requested: false,
-            catalog: None,
+            lineup: None,
             checked_at: None,
         }
     }
@@ -94,7 +99,7 @@ impl Model {
             .count()
     }
 
-    /// Minuten seit der letzten erfolgreich geprüften Katalog-Signatur.
+    /// Minuten seit der letzten Suche.
     pub fn minutes_since_check(&self) -> Option<u64> {
         self.checked_at.map(|t| t.elapsed().as_secs() / 60)
     }
@@ -121,27 +126,37 @@ impl Model {
     }
 
     fn build_cards(&mut self, status: &[AppStatus]) {
-        let Some(catalog) = &self.catalog else { return };
-        self.cards = catalog
+        let Some((lineup, texts)) = &self.lineup else {
+            return;
+        };
+        self.cards = lineup
             .apps
             .iter()
-            .filter_map(|app| {
+            .filter_map(|listed| {
+                let app = listed.app;
                 let s = status.iter().find(|s| s.id == app.id)?;
+                let text = |k: &str| {
+                    texts
+                        .iter()
+                        .find(|(key, _)| key == k)
+                        .map(|(_, v)| v.clone())
+                        .unwrap_or_default()
+                };
                 let state = match (&s.installed, s.update_available) {
                     (None, _) => CardState::NotInstalled,
                     (Some(_), true) => CardState::UpdateAvailable,
                     (Some(_), false) => CardState::Installed,
                 };
                 Some(Card {
-                    id: app.id.clone(),
-                    name: app.name.clone(),
-                    description: app.description.clone(),
+                    id: app.id.to_string(),
+                    name: app.name.to_string(),
+                    description: text(&format!("apps.{}.description", app.id)),
                     installed: s.installed.clone(),
                     latest: s.latest.clone(),
                     state,
-                    date: app.latest().ok().flatten().map(|r| r.date.clone()),
-                    license: app.license.clone(),
-                    author: app.author.clone(),
+                    date: listed.latest().map(|l| l.date),
+                    license: LICENSE.to_string(),
+                    author: text("apps.author"),
                     running: s.running,
                 })
             })
@@ -150,19 +165,27 @@ impl Model {
 
     pub fn apply(&mut self, ev: Event, t: &Texts) {
         match ev {
-            Event::Catalog(Ok(c)) => {
+            Event::Lineup(l) => {
                 self.self_update = None;
-                self.catalog = Some(c);
+                // Ein Grund für die ganze Suche (z. B. kein Netz): leiser Hinweis, die Apps bleiben sichtbar.
+                self.notice = l.problem().map(|kind| {
+                    let text = crate::errors::block_message(t, kind, "");
+                    if kind == BlockKind::Offline || kind == BlockKind::SourceUnavailable {
+                        Notice::Info(text)
+                    } else {
+                        Notice::Error(text)
+                    }
+                });
+                let texts = l
+                    .apps
+                    .iter()
+                    .map(|a| format!("apps.{}.description", a.app.id))
+                    .chain(["apps.author".to_string()])
+                    .map(|k| (k.clone(), t.t(&k)))
+                    .collect();
+                self.lineup = Some((l, texts));
                 self.checked_at = Some(Instant::now());
                 self.load = Load::Ready;
-            }
-            Event::Catalog(Err(e)) => {
-                let text = error_message(t, &e);
-                if self.cards.is_empty() {
-                    self.load = Load::Failed(text);
-                } else {
-                    self.notice = Some(Notice::Error(text));
-                }
             }
             Event::Status(s) => self.build_cards(&s),
             Event::Running(ids) => {

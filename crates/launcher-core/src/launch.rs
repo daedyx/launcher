@@ -1,8 +1,6 @@
 use crate::error::CoreError;
 use crate::service::Launcher;
 use crate::state::State;
-use daedyx_update::catalog::is_valid_app_id;
-use daedyx_update::error::UpdateError;
 use std::path::{Component, Path, PathBuf};
 
 fn not_launchable(why: &str) -> CoreError {
@@ -38,8 +36,8 @@ pub fn launch_target(install_dir: &Path) -> Result<PathBuf, CoreError> {
 impl Launcher {
     /// Startet die installierte App und lässt sie unabhängig vom Launcher weiterlaufen.
     pub fn open(&self, app_id: &str) -> Result<(), CoreError> {
-        if !is_valid_app_id(app_id) {
-            return Err(UpdateError::UnknownApp(app_id.to_string()).into());
+        if crate::apps::find(app_id).is_none() {
+            return Err(CoreError::UnknownApp(app_id.to_string()));
         }
         let state = State::load(&self.data_dir)?;
         let loc = self.locate(&state, app_id);

@@ -1,14 +1,18 @@
-use daedyx_update::error::UpdateError;
+use daedyx_update::reason::Blocked;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CoreError {
-    #[error(transparent)]
-    Update(#[from] UpdateError),
-    #[error("Diese Quelle ist nicht erlaubt: {0}")]
-    SourceNotAllowed(String),
-    #[error("Der Download ist fehlgeschlagen: {0}")]
-    Download(String),
+    /// Suche oder Download ohne Ergebnis: Netz, Nachweis, Eintrag oder Datei (Grund für den Nutzertext in `kind`).
+    #[error("{app}: {blocked}")]
+    Blocked { app: String, blocked: Blocked },
+    /// Für diese App gibt es (noch) kein geprüftes Angebot.
+    #[error("Für {0} gibt es keine geprüfte Version")]
+    NotOffered(String),
+    #[error("Dieser Launcher ist zu alt (nötig: {need}, vorhanden: {have})")]
+    LauncherTooOld { need: String, have: String },
+    #[error("Die App {0} kennt dieser Launcher nicht")]
+    UnknownApp(String),
     #[error("Der Installer ist fehlgeschlagen (Code {0})")]
     InstallerFailed(i32),
     #[error("Diese Plattform wird nicht unterstützt: {0}")]
@@ -17,10 +21,6 @@ pub enum CoreError {
     Busy(String),
     #[error("{0} läuft gerade. Schließe die App und versuche es noch einmal")]
     AppRunning(String),
-    #[error("Der Katalogordner wurde nicht gefunden: {0}")]
-    CatalogNotFound(String),
-    #[error("Es ist noch kein Katalog-Schlüssel eingebaut oder eingestellt (daedyx config set --pubkey <Datei>)")]
-    ConfigIncomplete,
     #[error("{0} ist nicht installiert")]
     NotInstalled(String),
     #[error("Die App lässt sich nicht starten: {0}")]

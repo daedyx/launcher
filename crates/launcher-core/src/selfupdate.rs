@@ -1,17 +1,14 @@
-//! Selbst-Update des Launchers: Er steht als App `launcher` im Katalog. Das Setup wird wie jedes
-//! Paket geprüft (Katalog-Signatur, Größe, SHA-256), dann still gestartet; danach beendet der
-//! Aufrufer den Launcher, und das Setup ersetzt ihn und startet ihn neu.
-use crate::download::download_verified;
+//! Selbst-Update des Launchers (U3): Das Setup kommt aus dem eigenen Repo `daedyx/launcher` und wird wie jedes Paket
+//! geprüft (GitHub-Nachweis, Eintrag, Größe, SHA-256), dann still gestartet; danach beendet der Aufrufer den Launcher,
+//! und das Setup ersetzt ihn und startet ihn neu. Nur eine echt höhere Version, so bleibt eine Update-Schleife aus.
+use crate::apps::{LAUNCHER, LAUNCHER_ID};
 use crate::error::CoreError;
-use crate::lock::Lock;
+use crate::lineup::Lineup;
 use crate::service::Launcher;
-use daedyx_update::catalog::Catalog;
-use daedyx_update::error::UpdateError;
-use daedyx_update::version::is_newer;
 use serde::Serialize;
 
-/// Kennung des Launchers im Katalog.
-pub const LAUNCHER_APP_ID: &str = "launcher";
+/// Kennung des Launchers in Fortschrittsmeldungen (wie früher im Katalog).
+pub const LAUNCHER_APP_ID: &str = LAUNCHER_ID;
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SelfUpdate {
@@ -20,65 +17,44 @@ pub struct SelfUpdate {
 }
 
 impl Launcher {
-    /// Gibt es im Katalog eine neuere Version des Launchers selbst?
-    pub fn self_update_available(
-        &self,
-        catalog: &Catalog,
-    ) -> Result<Option<SelfUpdate>, CoreError> {
-        let Ok(app) = catalog.app(LAUNCHER_APP_ID) else {
-            return Ok(None);
-        };
-        let Some(release) = app.latest()? else {
-            return Ok(None);
-        };
-        // Nur anbieten, wenn es ein Paket für diese Plattform gibt.
-        if release
-            .package_for(LAUNCHER_APP_ID, &self.platform)
-            .is_err()
-        {
-            return Ok(None);
-        }
-        if !is_newer(&release.version, &self.launcher_version)? {
-            return Ok(None);
-        }
-        Ok(Some(SelfUpdate {
-            version: release.version.clone(),
-            notes: release.notes.clone(),
-        }))
+    /// Gibt es eine geprüfte, höhere Version des Launchers selbst?
+    pub fn self_update_available(&self, lineup: &Lineup) -> Option<SelfUpdate> {
+        let latest = lineup.launcher.latest()?;
+        let newer = crate::service::newer(&latest.version, &self.launcher_version);
+        newer.then_some(SelfUpdate {
+            version: latest.version,
+            notes: latest.notes,
+        })
     }
 
-    /// Lädt das Setup der neueren Version, prüft es und startet es still (`/S /UPDATE`). Gibt
-    /// `None` zurück, wenn es kein Update gibt. Das Setup bleibt liegen, bis es läuft; es wird
-    /// beim nächsten Start aufgeräumt. Danach muss der Aufrufer den Launcher beenden.
+    /// Lädt das Setup der neueren Version, prüft es und startet es still (`/S /UPDATE`). Gibt `None` zurück, wenn es
+    /// kein Update gibt. Das Setup bleibt liegen, bis es läuft; es wird beim nächsten Start aufgeräumt. Danach muss
+    /// der Aufrufer den Launcher beenden.
     pub fn start_self_update(
         &self,
-        catalog: &Catalog,
+        lineup: &Lineup,
         relaunch: bool,
         progress: &mut dyn FnMut(u64, Option<u64>),
     ) -> Result<Option<SelfUpdate>, CoreError> {
-        let Some(update) = self.self_update_available(catalog)? else {
+        let (Some(update), Some(offer)) =
+            (self.self_update_available(lineup), lineup.launcher.offer())
+        else {
             return Ok(None);
         };
-        let app = catalog.app(LAUNCHER_APP_ID)?;
-        let release = app.latest()?.ok_or_else(|| UpdateError::NoPackage {
-            app: LAUNCHER_APP_ID.to_string(),
-            platform: self.platform.clone(),
-        })?;
-        let package = release.package_for(LAUNCHER_APP_ID, &self.platform)?;
-        let _lock = Lock::acquire(&self.data_dir.join("locks"), LAUNCHER_APP_ID)?;
-        let file_name = format!(
-            "{}-{}.{}",
-            LAUNCHER_APP_ID,
-            release.version,
-            package.kind.file_extension()
-        );
-        let setup = download_verified(
-            &self.source,
-            package,
-            &self.data_dir.join("downloads"),
-            &file_name,
-            progress,
-        )?;
+        self.check_launcher_version(offer.entry().min_launcher_version.as_ref())?;
+        let policy = LAUNCHER
+            .policy()
+            .ok_or_else(|| CoreError::PlatformUnsupported(LAUNCHER_ID.into()))?;
+        let _lock = self.lock(&LAUNCHER)?;
+        let setup = self
+            .remote
+            .fetch(&policy, offer, &self.downloads_dir(), &mut |d, t| {
+                progress(d, Some(t))
+            })
+            .map_err(|blocked| CoreError::Blocked {
+                app: LAUNCHER_ID.to_string(),
+                blocked,
+            })?;
         // `/NOLAUNCH`: das Setup startet den Launcher nach dem Update nicht neu (Kommandozeile, Tests).
         let args: &[&str] = if relaunch {
             &["/S", "/UPDATE"]
@@ -92,16 +68,15 @@ impl Launcher {
         Ok(Some(update))
     }
 
-    /// Löscht übrig gebliebene Setup-Dateien früherer Selbst-Updates (beim Start aufrufen).
+    pub(crate) fn downloads_dir(&self) -> std::path::PathBuf {
+        self.data_dir.join("downloads")
+    }
+
+    /// Löscht übrig gebliebene Setups und abgebrochene Downloads (beim Start aufrufen). Nur unter der Sperre des
+    /// Launchers, damit kein laufender Download eines zweiten Launchers verschwindet; Verknüpfungen bleiben unberührt.
     pub fn clean_self_update_leftovers(&self) {
-        let Ok(entries) = std::fs::read_dir(self.data_dir.join("downloads")) else {
-            return;
-        };
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with(&format!("{LAUNCHER_APP_ID}-")) {
-                let _ = std::fs::remove_file(entry.path());
-            }
+        if let Ok(_lock) = self.lock(&LAUNCHER) {
+            let _ = daedyx_update::download::clean_leftovers(&self.downloads_dir());
         }
     }
 }

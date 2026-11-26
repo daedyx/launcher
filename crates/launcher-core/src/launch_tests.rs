@@ -60,7 +60,7 @@ fn nicht_installierte_app_laesst_sich_nicht_oeffnen() {
     let env = Env::new();
     let (l, _) = env.launcher();
     assert!(matches!(l.open("desk"), Err(CoreError::NotInstalled(_))));
-    assert!(matches!(l.open("../x"), Err(CoreError::Update(_))));
+    assert!(matches!(l.open("../x"), Err(CoreError::UnknownApp(_))));
 }
 
 #[cfg(windows)]

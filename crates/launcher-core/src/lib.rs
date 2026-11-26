@@ -1,40 +1,46 @@
-﻿//! Kern des Daedyx Launchers: Quelle, Download, Zustand, Installation. Ohne Oberfläche.
+//! Kern des Daedyx Launchers: feste App-Liste, Update-Suche und Download über die gemeinsame Update-Bibliothek
+//! (`daedyx-update`, GitHub-Nachweis), Zustand, Installation. Ohne Oberfläche.
 
+pub mod apps;
 pub mod config;
-pub mod download;
 pub mod error;
 pub mod installer;
 pub mod jobs;
 pub mod launch;
+pub mod lineup;
 pub mod locate;
-pub mod lock;
+pub mod net;
 pub mod paths;
 pub mod probe;
+pub mod remote;
 pub mod selfupdate;
 pub mod service;
-pub mod source;
 pub mod state;
 pub mod sync;
 pub mod system;
 
+/// Die Kern-Bibliothek in genau der Fassung, die dieser Launcher benutzt (Oberfläche und Kommandozeile tragen keine
+/// zweite Kern-Quelle ein).
+pub use daedyx_update;
+
+#[cfg(test)]
+mod apps_tests;
 #[cfg(test)]
 mod config_tests;
-#[cfg(test)]
-mod download_tests;
 #[cfg(test)]
 mod jobs_tests;
 #[cfg(test)]
 mod launch_tests;
 #[cfg(test)]
-mod lock_tests;
+mod lineup_tests;
+#[cfg(test)]
+mod net_tests;
 #[cfg(test)]
 mod paths_tests;
 #[cfg(test)]
 mod selfupdate_tests;
 #[cfg(test)]
 mod service_tests;
-#[cfg(test)]
-mod source_tests;
 #[cfg(test)]
 mod state_tests;
 #[cfg(test)]

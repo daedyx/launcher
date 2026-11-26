@@ -15,7 +15,6 @@ path = "src/bin/make_icon.rs"
 
 [dependencies]
 launcher-core = { path = "../launcher-core" }
-daedyx-update = { path = "../daedyx-update" }
 eframe.workspace = true
 clap.workspace = true
 serde.workspace = true

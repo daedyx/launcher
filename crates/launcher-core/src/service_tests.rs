@@ -1,61 +1,16 @@
+//! Dienste des Launchers mit gefälschtem Server und Attrappe für den Nachweis (U3): installieren, aktualisieren,
+//! entfernen, Registry übernehmen, laufende Apps, gemeinsame Sperre mit den Apps.
 use crate::error::CoreError;
-use crate::lock::Lock;
 use crate::service::{Launcher, Outcome};
 use crate::state::{InstalledApp, State};
 use crate::system::UninstallEntry;
 use crate::test_support::Env;
-use daedyx_update::error::UpdateError;
+use daedyx_update::lock::Lock;
+use daedyx_update::reason::BlockKind;
 
-fn install(l: &Launcher, env: &Env) -> Result<Outcome, CoreError> {
-    let catalog = l.load_catalog(&env.pubkey)?;
-    l.install(&catalog, "desk", &mut |_, _| {})
-}
-
-#[test]
-fn katalog_mit_gueltiger_signatur_wird_geladen() {
-    let env = Env::new();
-    env.publish(&["1.0.0"]);
-    let (l, _) = env.launcher();
-    assert_eq!(l.load_catalog(&env.pubkey).unwrap().apps.len(), 1);
-}
-
-#[test]
-fn veraenderter_katalog_wird_abgelehnt() {
-    let env = Env::new();
-    env.publish(&["1.0.0"]);
-    let path = env.catalog_dir.path().join("catalog.json");
-    let mut json = std::fs::read_to_string(&path).unwrap();
-    json.push(' ');
-    std::fs::write(&path, json).unwrap();
-    let (l, _) = env.launcher();
-    assert!(matches!(
-        l.load_catalog(&env.pubkey),
-        Err(CoreError::Update(UpdateError::SignatureInvalid))
-    ));
-}
-
-#[test]
-fn katalog_mit_fremdem_schluessel_wird_abgelehnt() {
-    let env = Env::new();
-    env.publish(&["1.0.0"]);
-    let other = Env::new();
-    let (l, _) = env.launcher();
-    assert!(matches!(
-        l.load_catalog(&other.pubkey),
-        Err(CoreError::Update(UpdateError::SignatureInvalid))
-    ));
-}
-
-#[test]
-fn zu_alter_launcher_wird_abgelehnt() {
-    let env = Env::new();
-    env.publish(&["1.0.0"]);
-    let (mut l, _) = env.launcher();
-    l.launcher_version = "0.0.1".into();
-    assert!(matches!(
-        l.load_catalog(&env.pubkey),
-        Err(CoreError::Update(UpdateError::LauncherTooOld { .. }))
-    ));
+fn install(l: &Launcher, _env: &Env) -> Result<Outcome, CoreError> {
+    let lineup = l.load_lineup();
+    l.install(&lineup, "desk", &mut |_, _| {})
 }
 
 #[test]
@@ -63,9 +18,13 @@ fn status_vor_der_installation() {
     let env = Env::new();
     env.publish(&["1.0.0"]);
     let (l, _) = env.launcher();
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     let s = l.status(&catalog).unwrap();
-    assert_eq!(s.len(), 1);
+    assert_eq!(
+        s.iter().map(|a| a.id.as_str()).collect::<Vec<_>>(),
+        ["desk", "tasks"]
+    );
+    assert_eq!(s[1].latest, None, "Tasks ist nicht veröffentlicht (404)");
     assert_eq!(s[0].installed, None);
     assert_eq!(s[0].latest.as_deref(), Some("1.0.0"));
     assert!(!s[0].update_available);
@@ -91,7 +50,7 @@ fn installieren_schreibt_app_und_zustand() {
         installer.calls.lock().unwrap().as_slice(),
         ["install 1.0.0"]
     );
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     assert_eq!(
         l.status(&catalog).unwrap()[0].installed.as_deref(),
         Some("1.0.0")
@@ -131,7 +90,7 @@ fn update_auf_neuere_version() {
     install(&l, &env).unwrap();
 
     env.publish(&["1.0.0", "1.1.0"]);
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     assert!(l.status(&catalog).unwrap()[0].update_available);
     assert_eq!(
         install(&l, &env).unwrap(),
@@ -140,7 +99,7 @@ fn update_auf_neuere_version() {
             to: "1.1.0".into()
         }
     );
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     let s = &l.status(&catalog).unwrap()[0];
     assert_eq!(s.installed.as_deref(), Some("1.1.0"));
     assert!(!s.update_available);
@@ -153,7 +112,7 @@ fn falsche_pruefsumme_startet_den_installer_nicht() {
     let (l, installer) = env.launcher();
     assert!(matches!(
         install(&l, &env),
-        Err(CoreError::Update(UpdateError::ChecksumMismatch))
+        Err(CoreError::Blocked { blocked, .. }) if blocked.kind == BlockKind::NotTrusted
     ));
     assert!(installer.calls.lock().unwrap().is_empty());
     assert!(!env.data_dir.path().join("apps/desk").exists());
@@ -181,12 +140,9 @@ fn entfernen_loescht_app_und_zustand() {
 fn entfernen_lehnt_gefaehrliche_kennungen_ab() {
     let env = Env::new();
     let (l, _) = env.launcher();
-    for bad in ["..", "../x", "a/b", ""] {
+    for bad in ["..", "../x", "a/b", "", "board"] {
         assert!(
-            matches!(
-                l.remove(bad),
-                Err(CoreError::Update(UpdateError::UnknownApp(_)))
-            ),
+            matches!(l.remove(bad), Err(CoreError::UnknownApp(_))),
             "{bad:?} hätte abgelehnt werden müssen"
         );
     }
@@ -217,8 +173,12 @@ fn laufende_installation_sperrt_eine_zweite() {
     let env = Env::new();
     env.publish(&["1.0.0"]);
     let (l, _) = env.launcher();
-    let _held = Lock::acquire(&env.data_dir.path().join("locks"), "desk").unwrap();
-    assert!(matches!(install(&l, &env), Err(CoreError::Busy(_))));
+    // Dieselbe Sperre, die Desk bei seinem eigenen Update holt (`<lokal>\daedyx\locks\daedyx-desk.lock`).
+    let held = Lock::acquire(&env.lock_dir(), "daedyx-desk").unwrap();
+    assert!(matches!(install(&l, &env), Err(CoreError::Busy(a)) if a == "desk"));
+    assert!(!env.data_dir.path().join("apps/desk").exists());
+    drop(held);
+    assert!(matches!(install(&l, &env), Ok(Outcome::Installed { .. })));
 }
 
 #[test]
@@ -256,7 +216,7 @@ fn von_hand_installierte_app_wird_aus_der_registry_uebernommen() {
     env.publish(&["1.0.0"]);
     let (l, _, system) = env.launcher_with_system();
     let dir = manual_install(&env, &system, "0.5.0");
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     let s = l.status(&catalog).unwrap();
     assert_eq!(s[0].installed.as_deref(), Some("0.5.0"));
     assert!(s[0].update_available);
@@ -273,7 +233,7 @@ fn ohne_app_json_gilt_die_version_aus_der_registry() {
     let (l, _, system) = env.launcher_with_system();
     let dir = manual_install(&env, &system, "0.4.0");
     std::fs::remove_file(dir.join("app.json")).unwrap();
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     assert_eq!(
         l.status(&catalog).unwrap()[0].installed.as_deref(),
         Some("0.4.0")
@@ -287,7 +247,7 @@ fn registry_eintrag_ohne_ordner_gilt_nicht_als_installiert() {
     let (l, _, system) = env.launcher_with_system();
     let dir = manual_install(&env, &system, "0.4.0");
     std::fs::remove_dir_all(&dir).unwrap();
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     assert_eq!(l.status(&catalog).unwrap()[0].installed, None);
 }
 
@@ -344,16 +304,16 @@ fn status_und_running_apps_melden_laeuft() {
     env.publish(&["1.0.0"]);
     let (l, _, system) = env.launcher_with_system();
     install(&l, &env).unwrap();
-    let catalog = l.load_catalog(&env.pubkey).unwrap();
+    let catalog = l.load_lineup();
     assert!(!l.status(&catalog).unwrap()[0].running);
-    assert!(l.running_apps(&catalog).unwrap().is_empty());
+    assert!(l.running_apps().unwrap().is_empty());
     system
         .running
         .lock()
         .unwrap()
         .push(env.data_dir.path().join("apps/desk"));
     assert!(l.status(&catalog).unwrap()[0].running);
-    assert_eq!(l.running_apps(&catalog).unwrap(), ["desk"]);
+    assert_eq!(l.running_apps().unwrap(), ["desk"]);
 }
 
 #[test]
@@ -377,7 +337,83 @@ fn oeffnen_findet_auch_eine_uebernommene_app() {
     env.publish(&["1.0.0"]);
     let (l, _, system) = env.launcher_with_system();
     manual_install(&env, &system, "0.5.0");
-    let _ = l.load_catalog(&env.pubkey).unwrap(); // merkt sich den Registry-Namen
-                                                  // Das Startprogramm `desk.exe` gibt es in der Attrappe nicht: gefunden, aber nicht startbar.
+    // Das Startprogramm `desk.exe` gibt es in der Attrappe nicht: gefunden, aber nicht startbar.
     assert!(matches!(l.open("desk"), Err(CoreError::NotLaunchable(_))));
+}
+
+#[test]
+fn ein_abgelehnter_nachweis_installiert_nichts() {
+    let env = Env::new();
+    env.publish(&["1.0.0"]);
+    env.trusted
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+    let (l, installer) = env.launcher();
+    let lineup = l.load_lineup();
+    assert_eq!(
+        lineup.get("desk").unwrap().blocked().unwrap().kind,
+        BlockKind::NotTrusted
+    );
+    assert!(matches!(
+        l.install(&lineup, "desk", &mut |_, _| {}),
+        Err(CoreError::Blocked { blocked, .. }) if blocked.kind == BlockKind::NotTrusted
+    ));
+    assert!(installer.calls.lock().unwrap().is_empty());
+}
+
+#[test]
+fn ohne_netz_bleiben_installierte_apps_sichtbar_und_nichts_wird_installiert() {
+    let env = Env::new();
+    env.publish(&["1.0.0"]);
+    let (l, installer) = env.launcher();
+    install(&l, &env).unwrap();
+    env.server
+        .offline
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let lineup = l.load_lineup();
+    assert_eq!(lineup.problem(), Some(BlockKind::Offline));
+    let s = l.status(&lineup).unwrap();
+    assert_eq!(s[0].installed.as_deref(), Some("1.0.0"));
+    assert_eq!(s[0].latest, None);
+    assert!(matches!(
+        l.install(&lineup, "desk", &mut |_, _| {}),
+        Err(CoreError::Blocked { blocked, .. }) if blocked.kind == BlockKind::Offline
+    ));
+    assert_eq!(installer.calls.lock().unwrap().len(), 1);
+}
+
+#[test]
+fn ein_eintrag_fuer_einen_neueren_launcher_wird_nicht_geladen() {
+    let env = Env::new();
+    env.release(
+        crate::apps::find("desk").unwrap(),
+        "1.0.0",
+        false,
+        Some("9.0.0"),
+    );
+    let (l, installer) = env.launcher();
+    assert!(
+        matches!(install(&l, &env), Err(CoreError::LauncherTooOld { need, .. }) if need == "9.0.0")
+    );
+    assert!(installer.calls.lock().unwrap().is_empty());
+    let urls = env.server.requests.lock().unwrap().clone();
+    assert!(
+        !urls.iter().any(|u| u.ends_with("-setup.exe")),
+        "kein Setup angefragt: {urls:?}"
+    );
+}
+
+#[test]
+fn nur_eine_echt_hoehere_version_wird_angeboten() {
+    let env = Env::new();
+    env.publish(&["1.0.0"]);
+    let (l, _) = env.launcher();
+    install(&l, &env).unwrap();
+    // Die Quelle springt zurück: kein Angebot, kein Update.
+    env.publish(&["0.9.0"]);
+    let lineup = l.load_lineup();
+    assert_eq!(
+        lineup.get("desk").unwrap().blocked().unwrap().kind,
+        BlockKind::SourceWentBack
+    );
+    assert!(!l.status(&lineup).unwrap()[0].update_available);
 }

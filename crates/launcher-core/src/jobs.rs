@@ -1,9 +1,9 @@
 //! Hintergrund-Arbeiter: führt Aufträge in einem eigenen Thread aus und meldet Ereignisse.
 //! Der Kern kennt keine Oberfläche; ein Wecker-Rückruf sagt ihr nur, dass es etwas zu holen gibt.
 use crate::error::CoreError;
+use crate::lineup::Lineup;
 use crate::selfupdate::SelfUpdate;
 use crate::service::{AppStatus, Launcher, Outcome};
-use daedyx_update::catalog::Catalog;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,11 +22,12 @@ pub enum Job {
 
 #[derive(Debug)]
 pub enum Event {
-    Catalog(Result<Catalog, CoreError>),
+    /// Ergebnis der Suche für alle Apps (kommt immer, auch ohne Netz; Gründe stehen je App darin).
+    Lineup(Lineup),
     Status(Vec<AppStatus>),
     /// Kennungen der Apps, die gerade laufen.
     Running(Vec<String>),
-    /// Neuere Version des Launchers selbst im Katalog; kommt nach `Status`, nur wenn es eine gibt.
+    /// Geprüfte neuere Version des Launchers selbst; kommt nach `Status`, nur wenn es eine gibt.
     SelfUpdate(Option<SelfUpdate>),
     /// Das Setup wurde gestartet (`Ok(Some)`) oder ging schief; bei `Ok(Some)` beendet sich der
     /// Launcher, damit das Setup ihn ersetzen kann.
@@ -70,14 +71,14 @@ impl Emitter {
 }
 
 impl Worker {
-    pub fn start(launcher: Launcher, pubkey: String, wake: Wake) -> Worker {
+    pub fn start(launcher: Launcher, wake: Wake) -> Worker {
         let (jobs_tx, jobs_rx) = channel();
         let (events_tx, events_rx) = channel();
         let out = Emitter {
             tx: events_tx,
             wake,
         };
-        std::thread::spawn(move || run(launcher, pubkey, jobs_rx, out));
+        std::thread::spawn(move || run(launcher, jobs_rx, out));
         Worker {
             jobs: jobs_tx,
             events: events_rx,
@@ -106,24 +107,20 @@ pub fn percent(done: u64, total: Option<u64>) -> Option<u8> {
     })
 }
 
-fn refresh(launcher: &Launcher, pubkey: &str, catalog: &mut Option<Catalog>, out: &Emitter) {
-    match launcher.load_catalog(pubkey) {
-        Ok(c) => {
-            *catalog = Some(c.clone());
-            let update = launcher.self_update_available(&c).ok().flatten();
-            out.emit(Event::Catalog(Ok(c)));
-            emit_status(launcher, catalog, out);
-            // Nur wenn es ein Update gibt; die Reihenfolge Katalog, Status bleibt wie zugesagt.
-            if update.is_some() {
-                out.emit(Event::SelfUpdate(update));
-            }
-        }
-        Err(e) => out.emit(Event::Catalog(Err(e))),
+fn refresh(launcher: &Launcher, lineup: &mut Option<Lineup>, out: &Emitter) {
+    let l = launcher.load_lineup();
+    let update = launcher.self_update_available(&l);
+    *lineup = Some(l.clone());
+    out.emit(Event::Lineup(l));
+    emit_status(launcher, lineup, out);
+    // Nur wenn es ein Update gibt; die Reihenfolge Suche, Status bleibt wie zugesagt.
+    if update.is_some() {
+        out.emit(Event::SelfUpdate(update));
     }
 }
 
-fn emit_status(launcher: &Launcher, catalog: &Option<Catalog>, out: &Emitter) {
-    if let Some(Ok(status)) = catalog.as_ref().map(|c| launcher.status(c)) {
+fn emit_status(launcher: &Launcher, lineup: &Option<Lineup>, out: &Emitter) {
+    if let Some(Ok(status)) = lineup.as_ref().map(|l| launcher.status(l)) {
         out.emit(Event::Status(status));
     }
 }
@@ -149,48 +146,48 @@ fn progress_to<'a>(out: &'a Emitter, app: &'a str) -> impl FnMut(u64, Option<u64
 
 fn install(
     launcher: &Launcher,
-    catalog: &Catalog,
+    lineup: &Lineup,
     app: &str,
     out: &Emitter,
 ) -> Result<Outcome, CoreError> {
-    launcher.install(catalog, app, &mut progress_to(out, app))
+    launcher.install(lineup, app, &mut progress_to(out, app))
 }
 
-fn run(launcher: Launcher, pubkey: String, jobs: Receiver<Job>, out: Emitter) {
+fn run(launcher: Launcher, jobs: Receiver<Job>, out: Emitter) {
     launcher.clean_self_update_leftovers();
-    let mut catalog: Option<Catalog> = None;
+    let mut lineup: Option<Lineup> = None;
     while let Ok(job) = jobs.recv() {
         match job {
-            Job::Refresh => refresh(&launcher, &pubkey, &mut catalog, &out),
+            Job::Refresh => refresh(&launcher, &mut lineup, &out),
             Job::Install(app) => {
-                if catalog.is_none() {
-                    refresh(&launcher, &pubkey, &mut catalog, &out);
+                if lineup.is_none() {
+                    refresh(&launcher, &mut lineup, &out);
                 }
-                let result = match &catalog {
-                    Some(c) => install(&launcher, c, &app, &out),
-                    None => Err(CoreError::Download("Der Katalog ist nicht geladen".into())),
+                let result = match &lineup {
+                    Some(l) => install(&launcher, l, &app, &out),
+                    None => Err(CoreError::NotOffered(app.clone())),
                 };
                 out.emit(Event::Installed { app, result });
-                emit_status(&launcher, &catalog, &out);
+                emit_status(&launcher, &lineup, &out);
             }
             Job::Remove(app) => {
                 let result = launcher.remove(&app);
                 out.emit(Event::Removed { app, result });
-                emit_status(&launcher, &catalog, &out);
+                emit_status(&launcher, &lineup, &out);
             }
             Job::UpdateSelf => {
-                let result = match &catalog {
-                    Some(c) => launcher.start_self_update(
-                        c,
+                let result = match &lineup {
+                    Some(l) => launcher.start_self_update(
+                        l,
                         true,
                         &mut progress_to(&out, crate::selfupdate::LAUNCHER_APP_ID),
                     ),
-                    None => Err(CoreError::Download("Der Katalog ist nicht geladen".into())),
+                    None => Ok(None),
                 };
                 out.emit(Event::SelfUpdateStarted(result));
             }
             Job::CheckRunning => {
-                if let Some(Ok(ids)) = catalog.as_ref().map(|c| launcher.running_apps(c)) {
+                if let Ok(ids) = launcher.running_apps() {
                     out.emit(Event::Running(ids));
                 }
             }

@@ -2,12 +2,10 @@
 
 use clap::Parser;
 use eframe::egui;
-use launcher_core::config::{build_launcher, Config};
+use launcher_core::config::build_launcher;
 use launcher_core::jobs::{Wake, Worker};
 use launcher_core::paths::default_data_dir;
 use launcher_ui::app::LauncherApp;
-use launcher_ui::app_settings::Rebuild;
-use launcher_ui::errors::error_message;
 use launcher_ui::i18n::{system_locale, Texts};
 use launcher_ui::settings::UiSettings;
 use launcher_ui::settings_view::AppInfo;
@@ -18,12 +16,6 @@ use std::sync::Arc;
 #[derive(Parser)]
 #[command(name = "daedyx-launcher", version, about = "Daedyx Launcher")]
 struct Args {
-    /// Katalogquelle: Ordner oder Internetadresse
-    #[arg(long, env = "DAEDYX_CATALOG")]
-    catalog: Option<String>,
-    /// Öffentlicher minisign-Schlüssel des Katalogs (Datei)
-    #[arg(long, env = "DAEDYX_PUBKEY")]
-    pubkey: Option<PathBuf>,
     /// Datenordner des Launchers
     #[arg(long, env = "DAEDYX_DATA_DIR")]
     data_dir: Option<PathBuf>,
@@ -34,18 +26,6 @@ struct Args {
 
 fn data_dir(args: &Args) -> PathBuf {
     args.data_dir.clone().unwrap_or_else(default_data_dir)
-}
-
-/// Prüft die Einstellungen und startet den Arbeiter; Fehler als Text in der Sprache der Oberfläche.
-fn make_worker(
-    config: &Config,
-    data_dir: PathBuf,
-    t: &Texts,
-    wake: Wake,
-) -> Result<Worker, String> {
-    let (launcher, pubkey) = build_launcher(config, data_dir, env!("CARGO_PKG_VERSION"))
-        .map_err(|e| error_message(t, &e))?;
-    Ok(Worker::start(launcher, pubkey, wake))
 }
 
 fn main() -> eframe::Result {
@@ -75,21 +55,14 @@ fn main() -> eframe::Result {
                     .send_viewport_cmd(egui::ViewportCommand::Minimized(true));
             }
             let dir = data_dir(&args);
-            let config =
-                Config::load(&dir).with_overrides(args.catalog.clone(), args.pubkey.clone());
             let ctx = cc.egui_ctx.clone();
             let wake: Wake = Arc::new(move || ctx.request_repaint());
-            let worker = make_worker(&config, dir.clone(), &t, wake.clone());
-            let info = AppInfo {
-                data_dir: dir.clone(),
-            };
-            let rebuild: Rebuild = Box::new(move |config, texts| {
-                make_worker(config, dir.clone(), texts, wake.clone())
-            });
+            // Feste Update-Quellen mit GitHub-Nachweis (U3): nichts einzustellen, also kein Fehler beim Start.
+            let launcher = build_launcher(dir.clone(), env!("CARGO_PKG_VERSION"));
+            let worker = Worker::start(launcher, wake);
+            let info = AppInfo { data_dir: dir };
             Ok(Box::new(
-                LauncherApp::new(t, worker)
-                    .with_settings(info, settings)
-                    .with_rebuild(&config, rebuild),
+                LauncherApp::new(t, Ok(worker)).with_settings(info, settings),
             ))
         }),
     )

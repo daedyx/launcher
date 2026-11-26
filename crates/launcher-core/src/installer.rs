@@ -1,5 +1,5 @@
 use crate::error::CoreError;
-use daedyx_update::catalog::PackageKind;
+use daedyx_update::entry::PackageKind;
 use std::path::Path;
 
 /// Führt Installation und Deinstallation aus. Die Tests ersetzen das durch eine Attrappe.

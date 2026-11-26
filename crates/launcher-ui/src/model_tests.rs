@@ -1,31 +1,57 @@
 use crate::i18n::Texts;
 use crate::model::{Busy, CardState, Load, Model, Notice};
-use daedyx_update::catalog::{App, Catalog};
-use daedyx_update::error::UpdateError;
+use launcher_core::apps;
+use launcher_core::daedyx_update::reason::{BlockKind, Blocked};
+use launcher_core::daedyx_update::version::Version;
 use launcher_core::error::CoreError;
 use launcher_core::jobs::Event;
+use launcher_core::lineup::{Found, Lineup, Listed};
 use launcher_core::service::{AppStatus, Outcome};
 
-fn catalog() -> Catalog {
-    Catalog {
-        schema: 1,
-        min_launcher_version: "0.1.0".into(),
-        apps: vec![App {
-            id: "notizbuch".into(),
-            name: "Notizbuch".into(),
-            description: "Kurze Notizen.".into(),
-            license: String::new(),
-            author: "Beispiel-Studio".into(),
-            registry_key: None,
-            releases: vec![],
-        }],
+/// Suchergebnis wie ohne Veröffentlichung (Desk „aktuell“, Tasks ohne Quelle); Angebote prüft der Kern.
+fn lineup() -> Lineup {
+    lineup_with(Found::UpToDate(Version::new(1, 1, 0)))
+}
+
+fn lineup_with(desk: Found) -> Lineup {
+    let blocked = |kind| {
+        Found::Blocked(Blocked {
+            kind,
+            detail: "test".into(),
+        })
+    };
+    Lineup {
+        apps: vec![
+            Listed {
+                app: apps::find("desk").unwrap(),
+                found: desk,
+            },
+            Listed {
+                app: apps::find("tasks").unwrap(),
+                found: blocked(BlockKind::SourceUnavailable),
+            },
+        ],
+        launcher: Listed {
+            app: &apps::LAUNCHER,
+            found: blocked(BlockKind::SourceUnavailable),
+        },
+    }
+}
+
+fn not_trusted() -> CoreError {
+    CoreError::Blocked {
+        app: "desk".into(),
+        blocked: Blocked {
+            kind: BlockKind::NotTrusted,
+            detail: "test".into(),
+        },
     }
 }
 
 fn status(installed: Option<&str>, latest: &str, update: bool) -> Event {
     Event::Status(vec![AppStatus {
-        id: "notizbuch".into(),
-        name: "Notizbuch".into(),
+        id: "desk".into(),
+        name: "Daedyx Desk".into(),
         installed: installed.map(String::from),
         latest: Some(latest.into()),
         update_available: update,
@@ -36,7 +62,7 @@ fn status(installed: Option<&str>, latest: &str, update: bool) -> Event {
 fn ready(installed: Option<&str>, update: bool) -> (Model, Texts) {
     let t = Texts::de();
     let mut m = Model::new();
-    m.apply(Event::Catalog(Ok(catalog())), &t);
+    m.apply(Event::Lineup(lineup()), &t);
     m.apply(status(installed, "1.1.0", update), &t);
     (m, t)
 }
@@ -51,9 +77,13 @@ fn katalog_und_status_ergeben_karten() {
     let (m, _) = ready(None, false);
     assert_eq!(m.load, Load::Ready);
     assert_eq!(m.cards.len(), 1);
-    assert_eq!(m.cards[0].name, "Notizbuch");
-    assert_eq!(m.cards[0].description, "Kurze Notizen.");
-    assert_eq!(m.cards[0].author, "Beispiel-Studio");
+    assert_eq!(m.cards[0].name, "Daedyx Desk");
+    assert_eq!(
+        m.cards[0].description,
+        "Mail, Kalender und Aufgaben in einer App."
+    );
+    assert_eq!(m.cards[0].author, "Daedyx");
+    assert_eq!(m.cards[0].license, "MIT");
     assert_eq!(m.cards[0].state, CardState::NotInstalled);
 }
 
@@ -66,33 +96,47 @@ fn installierte_und_veraltete_apps_haben_ihren_zustand() {
 }
 
 #[test]
-fn fehler_beim_ersten_laden_ersetzt_die_ansicht() {
+fn ohne_netz_bleiben_die_karten_und_ein_leiser_hinweis_erscheint() {
     let t = Texts::de();
     let mut m = Model::new();
     m.apply(
-        Event::Catalog(Err(UpdateError::SignatureInvalid.into())),
+        Event::Lineup(lineup_with(Found::Blocked(Blocked {
+            kind: BlockKind::Offline,
+            detail: "x".into(),
+        }))),
         &t,
     );
-    match &m.load {
-        Load::Failed(text) => assert!(text.contains("Echtheit")),
+    m.apply(status(Some("1.0.0"), "1.0.0", false), &t);
+    assert_eq!(m.load, Load::Ready);
+    assert_eq!(m.cards.len(), 1);
+    match &m.notice {
+        Some(Notice::Info(text)) => assert!(text.contains("Keine Verbindung"), "{text}"),
         other => panic!("{other:?}"),
     }
 }
 
 #[test]
-fn fehler_beim_neuladen_behaelt_die_karten() {
-    let (mut m, t) = ready(None, false);
-    m.apply(Event::Catalog(Err(CoreError::Download("weg".into()))), &t);
-    assert_eq!(m.load, Load::Ready);
-    assert_eq!(m.cards.len(), 1);
-    assert!(matches!(m.notice, Some(Notice::Error(_))));
+fn ein_abgelehnter_nachweis_ist_ein_fehlerhinweis() {
+    let t = Texts::de();
+    let mut m = Model::new();
+    m.apply(
+        Event::Lineup(lineup_with(Found::Blocked(Blocked {
+            kind: BlockKind::NotTrusted,
+            detail: "x".into(),
+        }))),
+        &t,
+    );
+    match &m.notice {
+        Some(Notice::Error(text)) => assert!(text.contains("nicht sicher von Daedyx"), "{text}"),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]
 fn fortschritt_setzt_busy_und_wechselt_bei_100_prozent_zum_installieren() {
     let (mut m, t) = ready(None, false);
     m.begin(
-        "notizbuch",
+        "desk",
         Busy::Downloading {
             done: 0,
             total: None,
@@ -100,14 +144,14 @@ fn fortschritt_setzt_busy_und_wechselt_bei_100_prozent_zum_installieren() {
     );
     m.apply(
         Event::Progress {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             done: 50,
             total: Some(100),
         },
         &t,
     );
     assert_eq!(
-        m.busy["notizbuch"],
+        m.busy["desk"],
         Busy::Downloading {
             done: 50,
             total: Some(100)
@@ -115,22 +159,22 @@ fn fortschritt_setzt_busy_und_wechselt_bei_100_prozent_zum_installieren() {
     );
     m.apply(
         Event::Progress {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             done: 100,
             total: Some(100),
         },
         &t,
     );
-    assert_eq!(m.busy["notizbuch"], Busy::Installing);
+    assert_eq!(m.busy["desk"], Busy::Installing);
 }
 
 #[test]
 fn erfolgreiche_installation_raeumt_auf_und_meldet() {
     let (mut m, t) = ready(None, false);
-    m.begin("notizbuch", Busy::Installing);
+    m.begin("desk", Busy::Installing);
     m.apply(
         Event::Installed {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             result: Ok(Outcome::Installed {
                 version: "1.1.0".into(),
             }),
@@ -140,7 +184,7 @@ fn erfolgreiche_installation_raeumt_auf_und_meldet() {
     assert!(m.busy.is_empty());
     assert_eq!(
         m.notice,
-        Some(Notice::Info("Notizbuch 1.1.0 wurde installiert.".into()))
+        Some(Notice::Info("Daedyx Desk 1.1.0 wurde installiert.".into()))
     );
 }
 
@@ -149,7 +193,7 @@ fn update_und_schon_aktuell_haben_eigene_hinweise() {
     let (mut m, t) = ready(Some("1.0.0"), true);
     m.apply(
         Event::Installed {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             result: Ok(Outcome::Updated {
                 from: "1.0.0".into(),
                 to: "1.1.0".into(),
@@ -160,12 +204,12 @@ fn update_und_schon_aktuell_haben_eigene_hinweise() {
     assert_eq!(
         m.notice,
         Some(Notice::Info(
-            "Notizbuch wurde auf Version 1.1.0 aktualisiert.".into()
+            "Daedyx Desk wurde auf Version 1.1.0 aktualisiert.".into()
         ))
     );
     m.apply(
         Event::Installed {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             result: Ok(Outcome::UpToDate {
                 version: "1.1.0".into(),
             }),
@@ -174,24 +218,24 @@ fn update_und_schon_aktuell_haben_eigene_hinweise() {
     );
     assert_eq!(
         m.notice,
-        Some(Notice::Info("Notizbuch ist schon aktuell.".into()))
+        Some(Notice::Info("Daedyx Desk ist schon aktuell.".into()))
     );
 }
 
 #[test]
 fn fehlgeschlagene_installation_zeigt_fehlertext_und_gibt_die_karte_frei() {
     let (mut m, t) = ready(None, false);
-    m.begin("notizbuch", Busy::Installing);
+    m.begin("desk", Busy::Installing);
     m.apply(
         Event::Installed {
-            app: "notizbuch".into(),
-            result: Err(UpdateError::ChecksumMismatch.into()),
+            app: "desk".into(),
+            result: Err(not_trusted()),
         },
         &t,
     );
     assert!(m.busy.is_empty());
     match m.notice {
-        Some(Notice::Error(text)) => assert!(text.contains("nichts installiert")),
+        Some(Notice::Error(text)) => assert!(text.contains("nicht installiert")),
         other => panic!("{other:?}"),
     }
 }
@@ -199,10 +243,10 @@ fn fehlgeschlagene_installation_zeigt_fehlertext_und_gibt_die_karte_frei() {
 #[test]
 fn entfernen_und_oeffnen_melden_ergebnis() {
     let (mut m, t) = ready(Some("1.0.0"), false);
-    m.begin("notizbuch", Busy::Removing);
+    m.begin("desk", Busy::Removing);
     m.apply(
         Event::Removed {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             result: Ok(()),
         },
         &t,
@@ -210,23 +254,23 @@ fn entfernen_und_oeffnen_melden_ergebnis() {
     assert!(m.busy.is_empty());
     assert_eq!(
         m.notice,
-        Some(Notice::Info("Notizbuch wurde entfernt.".into()))
+        Some(Notice::Info("Daedyx Desk wurde entfernt.".into()))
     );
     m.apply(
         Event::Opened {
-            app: "notizbuch".into(),
+            app: "desk".into(),
             result: Ok(()),
         },
         &t,
     );
     assert_eq!(
         m.notice,
-        Some(Notice::Info("Notizbuch wird gestartet.".into()))
+        Some(Notice::Info("Daedyx Desk wird gestartet.".into()))
     );
     m.apply(
         Event::Opened {
-            app: "notizbuch".into(),
-            result: Err(CoreError::NotInstalled("notizbuch".into())),
+            app: "desk".into(),
+            result: Err(CoreError::NotInstalled("desk".into())),
         },
         &t,
     );
@@ -238,7 +282,7 @@ fn neue_aktion_loescht_den_alten_hinweis() {
     let (mut m, _) = ready(None, false);
     m.notice = Some(Notice::Info("alt".into()));
     m.begin(
-        "notizbuch",
+        "desk",
         Busy::Downloading {
             done: 0,
             total: None,
@@ -251,7 +295,7 @@ fn neue_aktion_loescht_den_alten_hinweis() {
 fn laeuft_meldung_setzt_und_loescht_die_markierung() {
     let (mut m, t) = ready(Some("1.0.0"), false);
     assert!(!m.cards[0].running);
-    m.apply(Event::Running(vec!["notizbuch".into()]), &t);
+    m.apply(Event::Running(vec!["desk".into()]), &t);
     assert!(m.cards[0].running);
     m.apply(Event::Running(vec![]), &t);
     assert!(!m.cards[0].running);
@@ -261,11 +305,11 @@ fn laeuft_meldung_setzt_und_loescht_die_markierung() {
 fn status_mit_laeuft_wird_uebernommen() {
     let t = Texts::de();
     let mut m = Model::new();
-    m.apply(Event::Catalog(Ok(catalog())), &t);
+    m.apply(Event::Lineup(lineup()), &t);
     m.apply(
         Event::Status(vec![AppStatus {
-            id: "notizbuch".into(),
-            name: "Notizbuch".into(),
+            id: "desk".into(),
+            name: "Daedyx Desk".into(),
             installed: Some("1.0.0".into()),
             latest: Some("1.0.0".into()),
             update_available: false,
@@ -291,8 +335,8 @@ fn launcher_update_wird_gemerkt_und_beim_neuen_katalog_geloescht() {
         m.self_update.as_ref().map(|u| u.version.as_str()),
         Some("0.2.0")
     );
-    m.apply(Event::Catalog(Ok(catalog())), &t);
-    assert!(m.self_update.is_none(), "der neue Katalog entscheidet neu");
+    m.apply(Event::Lineup(lineup()), &t);
+    assert!(m.self_update.is_none(), "die neue Suche entscheidet neu");
 }
 
 #[test]
@@ -318,10 +362,7 @@ fn gestartetes_setup_loest_das_beenden_aus_ein_fehler_nicht() {
     assert!(m.quit_requested);
     let (mut m, t) = ready(None, false);
     m.self_progress = Some(0.5);
-    m.apply(
-        Event::SelfUpdateStarted(Err(UpdateError::ChecksumMismatch.into())),
-        &t,
-    );
+    m.apply(Event::SelfUpdateStarted(Err(not_trusted())), &t);
     assert!(!m.quit_requested);
     assert_eq!(m.self_progress, None);
     assert!(matches!(m.notice, Some(Notice::Error(_))));
