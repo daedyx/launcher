@@ -89,6 +89,13 @@ jobs:
       - name: Tests mit Protokoll
         shell: bash
         run: cargo test --workspace --all-features --locked --offline 2>&1 | tee "$RUNNER_TEMP/test.log"
+      # Der Release-Lauf testet unter pwsh 7, nicht unter bash: Die Tests, die Windows PowerShell 5.1 starten, laufen
+      # deshalb auch hier unter pwsh (Release-Lauf 1 war nur dort rot).
+      - name: PowerShell-Tests unter pwsh (wie im Release-Lauf)
+        shell: pwsh
+        run: |
+          cargo test -p launcher-core --lib --all-features --locked --offline release_tests
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell-Tests unter pwsh rot" }
       # Keine Testgruppe darf still wegfallen: Mindestzahl je Testprogramm aus dem Commit (xtask/testzahlen.txt).
       - name: Testzahl
         shell: pwsh

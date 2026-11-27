@@ -38,9 +38,9 @@ fn sha(path: &Path) -> [u8; 32] {
     sha2::Sha256::digest(std::fs::read(path).unwrap()).into()
 }
 
-/// Windows PowerShell 5.1 mit einem Skript und Argumenten; liefert den Fehlercode.
+/// Windows PowerShell 5.1 mit einem Skript und Argumenten; liefert den Fehlercode mit der Ausgabe des Skripts.
 #[allow(clippy::disallowed_methods, reason = "SICHERHEIT-AUSNAHMEN A-031")]
-pub(super) fn powershell(script: &Path, args: &[&str]) -> Option<i32> {
+pub(super) fn powershell(script: &Path, args: &[&str]) -> PsRun {
     let root = std::env::var_os("SystemRoot").unwrap();
     let ps = Path::new(&root).join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
     let head = [
@@ -50,18 +50,47 @@ pub(super) fn powershell(script: &Path, args: &[&str]) -> Option<i32> {
         "Bypass",
         "-File",
     ];
-    Command::new(ps)
+    // Modulpfad wie in einem frischen Windows PowerShell: Läuft `cargo test` unter pwsh 7 (Release-Lauf), erbt das
+    // Kind sonst dessen Pfad mit den Modulen von PowerShell 7, die Windows PowerShell nicht laden kann.
+    let out = Command::new(ps)
+        .env_remove("PSModulePath")
         .args(head)
         .arg(script)
         .args(args)
         .output()
-        .unwrap()
-        .status
-        .code()
+        .unwrap();
+    let log = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    PsRun {
+        code: out.status.code(),
+        log,
+    }
+}
+
+/// Ende eines Skripts mit seiner Ausgabe (stdout und stderr). Verglichen wird nur der Fehlercode; die Ausgabe steht
+/// in der Meldung von `assert_eq!`, wenn der Vergleich scheitert (Release-Lauf 1 war auf dem Läufer rot ohne Hinweis).
+pub(super) struct PsRun {
+    code: Option<i32>,
+    log: String,
+}
+
+impl PartialEq<Option<i32>> for PsRun {
+    fn eq(&self, other: &Option<i32>) -> bool {
+        self.code == *other
+    }
+}
+
+impl std::fmt::Debug for PsRun {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}, Ausgabe des Skripts:\n{}", self.code, self.log)
+    }
 }
 
 /// `entry.json` mit dem Skript des Workflows; liefert das Ende des Skripts.
-pub(super) fn make_entry(dir: &Path, setup: &Path, app: &str, notes: &str) -> Option<i32> {
+pub(super) fn make_entry(dir: &Path, setup: &Path, app: &str, notes: &str) -> PsRun {
     let notes_file = dir.join("notiz.txt");
     std::fs::write(&notes_file, notes).unwrap();
     let s = |p: &Path| p.to_str().unwrap().to_owned();
