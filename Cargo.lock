@@ -916,7 +916,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 [[package]]
 name = "daedyx-update"
 version = "0.2.3"
-source = "git+https://github.com/daedyx/core?rev=5bcb3d18d6b73a480a9db5a8ff2ee4b8ee3483fd#5bcb3d18d6b73a480a9db5a8ff2ee4b8ee3483fd"
+source = "git+https://github.com/daedyx/core?tag=daedyx-update-v0.2.0#4d6d9962aad7b445a5a21341ebcf76a4f83dd50f"
 dependencies = [
  "attestation-verify",
  "hex",

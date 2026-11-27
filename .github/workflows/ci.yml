@@ -40,6 +40,17 @@ jobs:
           if (git ls-files 'xtask/build.rs') { throw "xtask/build.rs ist nicht erlaubt" }
           $xtask = @(Get-Content xtask/Cargo.toml | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
           if ($xtask | Where-Object { $_ -match '^\[.*dependencies' -or $_ -match '^build\s*=' -or $_ -match 'proc-macro' }) { throw "xtask/Cargo.toml darf keine Abhängigkeiten und kein Build-Skript haben" }
+      - name: Keine Secrets in Workflows (release.yml ohne jedes Secret)
+        shell: pwsh
+        run: |
+          # Wie Tasks (Review T6 H6-2, Review T7v M-T7v-1): Zugriff mit Punkt, eckigen Klammern oder toJSON zählt. Groß/klein
+          # beachten: das Wort Secrets in Kommentaren ist kein Zugriff.
+          $treffer = Select-String -Path .github/workflows/*.yml -CaseSensitive -Pattern 'secrets\.(?!GITHUB_TOKEN\b)', 'secrets\[', 'toJSON\(\s*secrets'
+          if ($treffer) { $treffer; throw "Unerwartetes Secret in einem Workflow" }
+          # Der Release-Weg kommt ganz ohne Secret aus (plan-ohne-secrets). Die Zeile mit den Mustern steht wörtlich so im
+          # Test release_tests.rs (launcher-core), der sie gegen Beispiele prüft.
+          $releaseMuster = 'secrets\s*[.\[:)]', '\(\s*secrets'
+          if (Select-String -Path .github/workflows/release.yml -CaseSensitive -Pattern $releaseMuster) { throw "release.yml darf kein Secret lesen" }
       - name: Rust festnageln
         shell: pwsh
         run: |

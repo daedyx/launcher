@@ -16,6 +16,8 @@ pub mod probe;
 /// Installationsprobe ohne Nachweis, nur mit Merkmal `probe` (Review U3 F-U3-2).
 #[cfg(feature = "probe")]
 pub mod probe_local;
+/// Selbstprüfung eines Releases im Release-Lauf (Auftrag R1, Muster Tasks T7v).
+pub mod release_check;
 pub mod remote;
 pub mod selfupdate;
 pub mod service;
@@ -45,6 +47,8 @@ mod paths_tests;
 mod probe_guard_tests;
 #[cfg(all(test, feature = "probe"))]
 mod probe_local_tests;
+#[cfg(test)]
+mod release_tests;
 #[cfg(test)]
 mod selfupdate_tests;
 #[cfg(test)]

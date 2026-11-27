@@ -26,7 +26,6 @@ keine Fremdtexte in der Befehlszeile.
 | A-014 | crates/launcher-ui/src/bin/make_icon.rs | clippy::print_stdout, clippy::print_stderr | Entwicklerwerkzeug zum Erzeugen der Symboldatei, Konsolen-Ausgabe ist seine Aufgabe. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-11-23 |
 | A-015 | xtask/src/main.rs | clippy::print_stdout, clippy::print_stderr | Das Prüfwerkzeug meldet Datei, Zeile und Regel auf der Konsole, nie den gefundenen Text. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-11-23 |
 | A-017 | crates/launcher-ui/src/focus.rs | deprecated | Schon vor dem Rahmen vorhanden: veraltete egui-Schnittstelle für die Ebene des Fokusrings; Ersatz mit dem nächsten egui-Wechsel. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-06-30 |
-| A-018 | .github/workflows/release.yml | scan:secret-im-workflow | Alter Release-Ablauf mit Signaturschlüssel, Passwort und Token als GitHub-Secrets (SICHERHEIT 8.1 Nr. 7). Wird mit dem Plan „ohne Secrets“ (Attestierung) ersetzt; bis dahin keine neuen Secrets. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-02-28 |
 | A-019 | deny.toml | RUSTSEC-2026-0192 (ttf-parser nicht gepflegt) | Kommt über egui/winit (Schriften), keine bekannte Lücke, kein Ersatz verfügbar. Neu prüfen mit dem nächsten egui-Wechsel der Suite. | Bau-Chat, Ja des Betreuers 2026-11-24 | 2026-11-23 | 2027-02-28 |
 | A-020 | deny.toml | RUSTSEC-2026-0370 (zvariant nicht gepflegt) | Nur Linux-Barrierefreiheit über egui/accesskit, keine bekannte Lücke. | wie A-019 | 2026-11-23 | 2027-02-28 |
 | A-021 | deny.toml | RUSTSEC-2026-0371 (zbus_names nicht gepflegt) | wie A-020 | wie A-019 | 2026-11-23 | 2027-02-28 |
@@ -39,6 +38,9 @@ keine Fremdtexte in der Befehlszeile.
 | A-028 | crates/launcher-core/src/system.rs | cfg:not(windows) (`uninstall_entry`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
 | A-029 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`is_enabled`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
 | A-030 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`set`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
+| A-031 | crates/launcher-core/src/release_flow_tests.rs | clippy::disallowed_methods | Nur Test (Auftrag R1, wie Tasks `release_flow_tests.rs`): startet Windows PowerShell 5.1 aus `%SystemRoot%\System32` mit `-NoProfile -NonInteractive -File` und einem Skript aus dem Repo (`scripts/ci/make-entry.ps1`) bzw. einem im Testordner geschriebenen Prüfskript, Eingaben nur erfundene Testdaten. **Ja des Betreuers ausstehend.** | Bau-Chat R1 | 2026-11-27 | 2027-11-27 |
+
+**A-018 entfällt** (Auftrag R1, 2026-11-27): `release.yml` liest kein Secret mehr (Release über GitHub-Nachweis, `docs/RELEASE.md`); `ci.yml` meldet jedes Secret in Workflows als Fehler. Die Nummer bleibt frei.
 
 Eine Zeile mit Regel `scan:<regel>` erlaubt genau diesen Fund des Scans in genau dieser Datei bis zum
 Ablaufdatum; sie zählt nicht als Code-Stelle. Gedacht nur für Altlasten, deren Ablösung beschlossen ist.

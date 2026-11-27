@@ -1,4 +1,8 @@
-# Den Launcher per Knopfdruck veröffentlichen (GitHub Actions)
+# Den Launcher per Knopfdruck veröffentlichen (GitHub Actions) — ALTER WEG
+
+> **Gilt nicht mehr (Auftrag R1, 2026-11-27).** Neue Releases laufen ohne Secrets über den Nachweis von GitHub:
+> siehe `docs/RELEASE.md`. Diese Anleitung beschreibt nur noch den alten Katalog-Weg (plan-ohne-secrets Weg A), falls
+> ihn jemand ausdrücklich noch einmal braucht; der Workflow dazu ist ersetzt.
 
 Stand: 2026-11-17. Ziel: auf „Run workflow“ drücken, eine neue Launcher-Version erscheint, installierte Launcher holen sie von selbst (Selbst-Update). Keine PowerShell im Alltag.
 

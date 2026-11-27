@@ -17,9 +17,9 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
 thiserror = "2.0.21"
-# Gemeinsame Update-Bibliothek (Kern daedyx/core, U1; bis zum nächsten Kern-Tag per rev auf Zweig paket-u3-net mit
-# dem Merkmal `net`, U3 F-U3-1): Eintrag, GitHub-Nachweis, Version, Download, Sperre, Zustand.
-daedyx-update = { git = "https://github.com/daedyx/core", rev = "5bcb3d18d6b73a480a9db5a8ff2ee4b8ee3483fd", features = ["net"] }
+# Gemeinsame Update-Bibliothek (Kern daedyx/core, U1) per Tag, mit dem Merkmal `net` (U3 F-U3-1): Eintrag,
+# GitHub-Nachweis, Version, Download, Sperre, Zustand, Netz.
+daedyx-update = { git = "https://github.com/daedyx/core", tag = "daedyx-update-v0.2.0", features = ["net"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 dirs = "7.0.0"
 tempfile = "3.27.0"
