@@ -38,7 +38,7 @@ keine Fremdtexte in der Befehlszeile.
 | A-028 | crates/launcher-core/src/system.rs | cfg:not(windows) (`uninstall_entry`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
 | A-029 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`is_enabled`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
 | A-030 | crates/launcher-ui/src/autostart.rs | cfg:not(windows) (`set`) | wie A-025 | Bau-Chat Prüflücken, Ja des Betreuers 2026-11-24 | 2026-11-24 | 2027-05-31 |
-| A-031 | crates/launcher-core/src/release_flow_tests.rs | clippy::disallowed_methods | Nur Test (Auftrag R1, wie Tasks `release_flow_tests.rs`): startet Windows PowerShell 5.1 aus `%SystemRoot%\System32` mit `-NoProfile -NonInteractive -File` und einem Skript aus dem Repo (`scripts/ci/make-entry.ps1`) bzw. einem im Testordner geschriebenen Prüfskript, Eingaben nur erfundene Testdaten. **Ja des Betreuers ausstehend.** | Bau-Chat R1 | 2026-11-27 | 2027-11-27 |
+| A-031 | crates/launcher-core/src/release_flow_tests.rs | clippy::disallowed_methods | Nur Test (Auftrag R1, wie Tasks `release_flow_tests.rs`): startet Windows PowerShell 5.1 aus `%SystemRoot%\System32` mit `-NoProfile -NonInteractive -File` und einem Skript aus dem Repo (`scripts/ci/make-entry.ps1`) bzw. einem im Testordner geschriebenen Prüfskript, Eingaben nur erfundene Testdaten. **Ja des Betreuers 2026-11-27.** | Bau-Chat R1 | 2026-11-27 | 2027-11-27 |
 
 **A-018 entfällt** (Auftrag R1, 2026-11-27): `release.yml` liest kein Secret mehr (Release über GitHub-Nachweis, `docs/RELEASE.md`); `ci.yml` meldet jedes Secret in Workflows als Fehler. Die Nummer bleibt frei.
 
