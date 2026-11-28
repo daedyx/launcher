@@ -24,7 +24,7 @@ fn every_app_has_a_valid_fixed_source() {
 #[test]
 fn the_ids_read_once_with_gh_api_stay_fixed() {
     let ids: Vec<(&str, u64)> = APPS.iter().map(|a| (a.repo, a.repo_id)).collect();
-    assert_eq!(ids, [("desk", 1_474_858_898), ("tasks", 1_474_858_832)]);
+    assert_eq!(ids, [("desk", 1_475_265_095), ("tasks", 1_474_858_832)]);
     assert_eq!(
         (LAUNCHER.repo, LAUNCHER.repo_id),
         ("launcher", 1_474_858_940)

@@ -43,7 +43,7 @@ pub const APPS: [KnownApp; 2] = [
         id: "desk",
         name: "Daedyx Desk",
         repo: "desk",
-        repo_id: 1_474_858_898,
+        repo_id: 1_475_265_095,
         update_app: "daedyx-desk",
         registry_key: Some("Daedyx Desk"),
     },
