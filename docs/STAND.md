@@ -3,6 +3,7 @@
 Letzte Änderung: 2026-11-26 (U3: Launcher 0.2.0 „Brücke“ auf der gemeinsamen Update-Bibliothek, Zweig `launcher-u3`)
 
 ## Wo wir stehen
+- **fix-release-2 (2026-11-28):** Der Release-Lauf 2 brach mit „makensis fehlt auf dem Läufer“ ab. Der Bau-Job läuft deshalb auf `windows-2022`, weil dort NSIS 3.10 vorinstalliert ist. Sein erster Schritt gibt `makensis /VERSION` aus. Die übrigen Jobs bleiben auf `windows-2025`. Der Test `jeder_job_hat_einen_festen_laeufer_und_der_bau_belegt_zuerst_nsis` legt die Läufer je Job fest (Konstanten `BUILD_RUNNER`, `RUNNER`) und verlangt den NSIS-Schritt als ersten Bau-Schritt. Siehe L4 in `docs/RELEASE.md`.
 - **R1: Release ohne Secrets (2026-11-27, Zweig `launcher-r1`):** `release.yml` neu nach dem Muster von Tasks T7v (vier Jobs mit je eigenen Rechten, Environment `release`, Aktionen per Commit-ID, `entry.json` und Nachweis, Selbstprüfung mit dem Prüfweg des Selbst-Updates nur im Job ohne Rechte). Kern per Tag `daedyx-update-v0.2.0`. Wächter `release_*_tests.rs`, Secret-Wächter in `ci.yml`, A-018 entfällt, A-031 neu (Ja des Betreuers ausstehend). Installationsprobe **21/21 OK**. Der installierte Launcher 0.1.0 findet 0.2.0 nicht im alten Katalog: einmal von Hand installieren (`docs/RELEASE.md`).
 - **Korrekturrunde U3 (2026-11-26, Review U3, Zweig `launcher-u3`):**
   - **M-U3-1:** Jedes geladene Setup wird vor dem Start über einen gesperrten Griff noch einmal gehasht und bis zum Ende von Installation bzw. Start festgehalten (`held.rs`, nur Standardbibliothek, wie `daedyx-sys::start_verified`). Damit gilt U-A8 nicht mehr.
